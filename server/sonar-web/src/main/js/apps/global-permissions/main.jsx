@@ -26,7 +26,7 @@ export default React.createClass({
             <h1 className="page-title">{window.t('global_permissions.page')}</h1>
             <p className="page-description">{window.t('global_permissions.page.description')}</p>
           </header>
-          <PermissionsList permissions={this.state.permissions}/>
+          <PermissionsList permissions={this.state.permissions} refresh={this.requestPermissions}/>
         </div>
     );
   }

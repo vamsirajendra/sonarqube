@@ -8,11 +8,16 @@ export default React.createClass({
 
   renderPermissions() {
     return this.props.permissions.map(permission => {
-      return <Permission key={permission.key} permission={permission} project={this.props.project}/>;
+      return <Permission key={permission.key} permission={permission} project={this.props.project}
+                         refresh={this.props.refresh}/>;
     });
   },
 
   render() {
-    return <ul id="global-permissions-list">{this.renderPermissions()}</ul>;
+    return (
+        <table className="table-list" id="global-permissions-list">
+          <tbody>{this.renderPermissions()}</tbody>
+        </table>
+    );
   }
 });

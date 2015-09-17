@@ -12,53 +12,26 @@ export default React.createClass({
     permission: React.PropTypes.object.isRequired
   },
 
-  getInitialState() {
-    return {};
-  },
-
-  componentDidMount() {
-    this.requestUsers();
-    this.requestGroups();
-  },
-
-  requestUsers() {
-    const url = `${window.baseUrl}/api/permissions/users`;
-    let data = { permission: this.props.permission.key, ps: MAX_ITEMS };
-    if (this.props.project) {
-      data.projectId = this.props.project;
-    }
-    $.get(url, data).done(r => this.setState({ users: r.users, totalUsers: r.paging && r.paging.total }));
-  },
-
-  requestGroups() {
-    const url = `${window.baseUrl}/api/permissions/groups`;
-    let data = { permission: this.props.permission.key, ps: MAX_ITEMS };
-    if (this.props.project) {
-      data.projectId = this.props.project;
-    }
-    $.get(url, data).done(r => this.setState({ groups: r.groups, totalGroups: r.paging && r.paging.total }));
-  },
-
   render() {
     return (
-        <li className="panel panel-vertical" data-id={this.props.permission.key}>
-          <h3>{this.props.permission.name}</h3>
-          <p className="spacer-top" dangerouslySetInnerHTML={{ __html: this.props.permission.description }}/>
-          <ul className="list-inline spacer-top">
+        <tr data-id={this.props.permission.key}>
+          <td className="text-top">
+            <div className="table-list-cell">
+              <h3>{this.props.permission.name}</h3>
+              <p className="spacer-top" dangerouslySetInnerHTML={{ __html: this.props.permission.description }}/>
+            </div>
+          </td>
+          <td className="text-middle thin nowrap">
             <PermissionUsers permission={this.props.permission}
                              project={this.props.project}
-                             max={MAX_ITEMS}
-                             items={this.state.users}
-                             total={this.state.totalUsers || this.props.permission.usersCount}
-                             refresh={this.requestUsers}/>
+                             refresh={this.props.refresh}/>
+          </td>
+          <td className="text-middle thin nowrap">
             <PermissionGroups permission={this.props.permission}
                               project={this.props.project}
-                              max={MAX_ITEMS}
-                              items={this.state.groups}
-                              total={this.state.totalGroups || this.props.permission.groupsCount}
-                              refresh={this.requestGroups}/>
-          </ul>
-        </li>
+                              refresh={this.props.refresh}/>
+          </td>
+        </tr>
     );
   }
 });

@@ -1,27 +1,15 @@
 import React from 'react';
-import PermissionsUsersGroupsMixin from './permission-users-groups-mixin';
-import Avatar from 'components/shared/avatar';
+import UserIcon from '../../components/shared/UserIcon';
 import UsersView from './users-view';
 
 export default React.createClass({
-  mixins: [PermissionsUsersGroupsMixin],
 
-  renderUpdateLink() {
+  render() {
     return (
-        <a onClick={this.updateUsers}
-           className="icon-bullet-list"
-           title="Update Users"
-           data-toggle="tooltip"
-           href="#"></a>
+        <a onClick={this.updateUsers} className="table-list-cell" href="#">
+          <UserIcon fill="#b4b4b4"/> {this.props.permission.usersCount}
+        </a>
     );
-  },
-
-  renderItem(item) {
-    return item.name;
-  },
-
-  renderTitle() {
-    return 'Users';
   },
 
   updateUsers(e) {
