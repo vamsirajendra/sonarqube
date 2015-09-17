@@ -1,0 +1,28 @@
+@import (reference) "../mixins";
+@import (reference) "../init/links";
+
+.table-list {
+  table-layout: fixed;
+}
+
+.table-list tbody tr:nth-child(even) {
+  background-color: #fff;
+
+  a.table-list-cell:hover { border-bottom-color: @darkBlue; }
+}
+
+.table-list tbody tr:nth-child(odd) {
+  background-color: #f5f5f5;
+
+  a.table-list-cell:hover { border-bottom-color: @darkBlue; }
+}
+
+.table-list-cell {
+  display: block;
+  padding: 8px 10px;
+
+  a& {
+    color: @baseFontColor;
+    border-bottom: 2px solid transparent;
+  }
+}

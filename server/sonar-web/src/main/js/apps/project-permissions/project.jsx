@@ -2,6 +2,8 @@ import React from 'react';
 import UsersView from './users-view';
 import GroupsView from './groups-view';
 import ApplyTemplateView from './apply-template-view';
+import UserIcon from '../../components/shared/UserIcon';
+import GroupIcon from '../../components/shared/GroupIcon';
 import {getProjectUrl} from '../../helpers/Url';
 
 export default React.createClass({
@@ -41,30 +43,24 @@ export default React.createClass({
   },
 
   render() {
-    let permissions = this.props.project.permissions.map(p => {
-      return (
-          <td key={p.key}>
-            <table>
-              <tr>
-                <td className="spacer-right">Users</td>
-                <td className="spacer-left bordered-left">{p.usersCount}</td>
-                <td className="spacer-left">
-                  <a onClick={this.showUsers.bind(this, p.key)} className="icon-bullet-list" title="Update Users"
-                     data-toggle="tooltip" href="#"></a>
-                </td>
-              </tr>
-              <tr>
-                <td className="spacer-right">Groups</td>
-                <td className="spacer-left bordered-left">{p.groupsCount}</td>
-                <td className="spacer-left">
-                  <a onClick={this.showGroups.bind(this, p.key)} className="icon-bullet-list" title="Update Users"
-                     data-toggle="tooltip" href="#"></a>
-                </td>
-              </tr>
-            </table>
+    let permissions = [];
+    this.props.project.permissions.forEach(p => {
+      permissions.push(
+          <td key={'users-' + p.key} className="text-center">
+            <a onClick={this.showUsers.bind(this, p.key)} className="table-list-cell" href="#">
+              <UserIcon fill="#b4b4b4"/> {p.usersCount}
+            </a>
+          </td>
+      );
+      permissions.push(
+          <td key={'groups-' + p.key} className="text-center">
+            <a onClick={this.showGroups.bind(this, p.key)} className="table-list-cell" href="#">
+              <GroupIcon fill="#b4b4b4"/> {p.groupsCount}
+            </a>
           </td>
       );
     });
+
     return (
         <tr>
           <td>
@@ -73,7 +69,7 @@ export default React.createClass({
             </strong>
           </td>
           {permissions}
-          <td className="thin nowrap text-right">
+          <td className="thin nowrap text-right big-spacer-left">
             <button onClick={this.applyTemplate} className="js-apply-template">Apply Template</button>
           </td>
         </tr>

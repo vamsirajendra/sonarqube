@@ -9,8 +9,11 @@ export default React.createClass({
     let cellWidth = (80 / this.props.permissions.length) + '%';
     let cells = this.props.permissions.map(p => {
       return (
-          <th key={p.key} style={{ width: cellWidth }}>
-            {p.name}<br/><span className="small">{p.description}</span>
+          <th key={p.key} colSpan="2" className="text-top" style={{ width: cellWidth }}>
+            <div className="table-list-cell">
+              <h4>{p.name}</h4>
+              <p className="note little-spacer-top">{p.description}</p>
+            </div>
           </th>
       );
     });

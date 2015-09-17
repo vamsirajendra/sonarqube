@@ -19,7 +19,7 @@ export default React.createClass({
           refresh={this.props.refresh}/>;
     });
     return (
-        <table id="projects" className="data zebra">
+        <table id="projects" className="table-list">
           <PermissionsHeader permissions={this.props.permissions}/>
           <tbody>{projects}</tbody>
         </table>
