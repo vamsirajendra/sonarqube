@@ -9,7 +9,7 @@ define(function (require) {
           .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
-          .checkElementCount('#users-list li[data-login]', 3)
+          .checkElementCount('#users-list [data-login]', 3)
           .checkElementInclude('#users-list .js-user-login', 'smith')
           .checkElementInclude('#users-list .js-user-name', 'Bob')
           .checkElementInclude('#users-list .js-user-email', 'bob@example.com')
@@ -31,19 +31,19 @@ define(function (require) {
           .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
-          .checkElementCount('#users-list li[data-login]', 3)
+          .checkElementCount('#users-list [data-login]', 3)
           .clearMocks()
           .mockFromFile('/api/users/search', 'users-spec/search-filtered.json')
           .fillElement('#users-search-query', 'ryan')
           .clickElement('#users-search-submit')
           .checkElementNotExist('[data-login="admin"]')
-          .checkElementCount('#users-list li[data-login]', 1)
+          .checkElementCount('#users-list [data-login]', 1)
           .clearMocks()
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .fillElement('#users-search-query', '')
           .clickElement('#users-search-submit')
           .checkElementCount('[data-login="admin"]', 1)
-          .checkElementCount('#users-list li[data-login]', 3);
+          .checkElementCount('#users-list [data-login]', 3);
     });
 
     bdd.it('should show more', function () {
@@ -52,12 +52,12 @@ define(function (require) {
           .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search-big-1.json')
           .startApp('users')
-          .checkElementCount('#users-list li[data-login]', 2)
+          .checkElementCount('#users-list [data-login]', 2)
           .clearMocks()
           .mockFromFile('/api/users/search', 'users-spec/search-big-2.json')
           .clickElement('#users-fetch-more')
           .checkElementCount('[data-login="ryan"]', 1)
-          .checkElementCount('#users-list li[data-login]', 3);
+          .checkElementCount('#users-list [data-login]', 3);
     });
 
     bdd.it('should create a new user', function () {
@@ -66,7 +66,7 @@ define(function (require) {
           .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
-          .checkElementCount('#users-list li[data-login]', 3)
+          .checkElementCount('#users-list [data-login]', 3)
           .clickElement('#users-create')
           .checkElementCount('#create-user-form', 1)
           .clearMocks()
@@ -82,7 +82,7 @@ define(function (require) {
           .fillElement('[name="scmAccounts"]:last-child', 'scm2')
           .clickElement('#create-user-submit')
           .checkElementCount('[data-login="login"]', 1)
-          .checkElementCount('#users-list li[data-login]', 4)
+          .checkElementCount('#users-list [data-login]', 4)
           .checkElementInclude('#users-list .js-user-login', 'login')
           .checkElementInclude('#users-list .js-user-name', 'name')
           .checkElementInclude('#users-list .js-user-email', 'email@example.com');

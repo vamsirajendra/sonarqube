@@ -7,8 +7,7 @@ define([
 ], function (UpdateView, ChangePasswordView, DeactivateView, GroupsView) {
 
   return Marionette.ItemView.extend({
-    tagName: 'li',
-    className: 'panel panel-vertical',
+    tagName: 'tr',
     template: Templates['users-list-item'],
 
     events: {
