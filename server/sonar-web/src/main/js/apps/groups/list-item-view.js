@@ -8,8 +8,7 @@ define([
   var $ = jQuery;
 
   return Marionette.ItemView.extend({
-    tagName: 'li',
-    className: 'panel panel-vertical',
+    tagName: 'tr',
     template: Templates['groups-list-item'],
 
     events: {
