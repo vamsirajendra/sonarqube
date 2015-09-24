@@ -269,31 +269,10 @@ define(function (require) {
           if (app === 'issues') {
             promise = promise.waitForCompletion(1);
           }
-          if (app === 'users') {
-            promise = promise.waitForCompletion(2);
+          if ((app === 'users') || (app === 'update-center') || (app === 'computation') || (app === 'custom-measures')) {
+            promise = promise.waitForCompletion(1);
           }
-          if (app === 'update-center') {
-            promise = promise.waitForCompletion(2);
-          }
-          if (app === 'computation') {
-            promise = promise.waitForCompletion(2);
-          }
-          if (app === 'coding-rules') {
-            promise = promise.waitForCompletion(3);
-          }
-          if (app === 'custom-measures') {
-            promise = promise.waitForCompletion(2);
-          }
-          if (app === 'quality-profiles') {
-            promise = promise.waitForCompletion(3);
-          }
-          if (app === 'source-viewer') {
-            promise = promise.waitForCompletion(3);
-          }
-          if (app === 'global-permissions') {
-            promise = promise.waitForCompletion(3);
-          }
-          if (app === 'project-permissions') {
+          if ((app === 'coding-rules') || (app === 'quality-profiles') || (app === 'source-viewer') || (app === 'global-permissions') || (app === 'project-permissions')) {
             promise = promise.waitForCompletion(3);
           }
       return promise;
