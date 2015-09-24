@@ -3,9 +3,59 @@ define(function (require) {
   var assert = require('intern/chai!assert');
   var fs = require('intern/dojo/node!fs');
   var Command = require('intern/dojo/node!leadfoot/Command');
-  var pollUntil = require('intern/dojo/node!leadfoot/helpers/pollUntil');
+  var util = require('intern/dojo/node!leadfoot/lib/util');
 
   var DEFAULT_TIMEOUT = 30000;
+
+  var pollUntil = function (poller, args, timeout) {
+  	pollInterval = 67;
+  	return function () {
+  		var session = this.session;
+  		var originalTimeout;
+
+  		return session.getExecuteAsyncTimeout().then(function () {
+  			if (!isNaN(timeout)) {
+  				originalTimeout = arguments[0];
+  			} else {
+  				timeout = arguments[0];
+  			}
+
+  			return session.setExecuteAsyncTimeout(timeout).then(function () {
+  				return session.executeAsync(function (poller, args, timeout, pollInterval, done) {
+  					poller = new Function(poller);
+  					var endTime = Number(new Date()) + timeout;
+  					(function poll() {
+  						var result = poller.apply(this, args);
+  						if (result != null) {
+  							done(result);
+  						} else if (Number(new Date()) < endTime) {
+  							setTimeout(poll, pollInterval);
+  						} else {
+  							done(null);
+  						}
+  					})();
+  				}, [ util.toExecuteString(poller), args, timeout, pollInterval ]);
+  			}).finally(function (result) {
+  				function finish() {
+  					if (result instanceof Error) {
+  						throw result;
+  					} else if (result === null) {
+  						var error = new Error('Polling timed out with no result');
+  						error.name = 'ScriptTimeout';
+  						throw error;
+  					} else {
+  						return result;
+  					}
+  				}
+  				if (!isNaN(originalTimeout)) {
+  					return session.setExecuteAsyncTimeout(originalTimeout).then(finish);
+  				} else {
+  					return finish();
+  				}
+  			});
+  		});
+  	};
+  };
 
   Command.prototype.checkElementCount = function (selector, count) {
     return new this.constructor(this, function () {
@@ -96,7 +146,7 @@ define(function (require) {
           .then(pollUntil(function (selector) {
             var elements = jQuery(selector);
             if (elements.size() === 0) {
-              return undefined;
+              return null;
             }
 
             var result = elements.first().click();
@@ -116,7 +166,7 @@ define(function (require) {
           .then(pollUntil(function (selector) {
             var elements = jQuery(selector);
             if (elements.size() === 0) {
-              return undefined;
+              return null;
             }
 
             elements.mouseup();
@@ -136,7 +186,7 @@ define(function (require) {
           .then(pollUntil(function (selector, what) {
             var elements = jQuery(selector);
             if (elements.size() === 0) {
-              return undefined;
+              return null;
             }
 
             elements.trigger(what);
@@ -156,7 +206,7 @@ define(function (require) {
           .then(pollUntil(function (selector) {
             var elements = jQuery(selector);
             if (elements.size() === 0) {
-              return undefined;
+              return null;
             }
 
             elements.change();
@@ -176,7 +226,7 @@ define(function (require) {
           .then(pollUntil(function (selector, value) {
             var elements = jQuery(selector);
             if (elements.size() === 0) {
-              return undefined;
+              return null;
             }
 
             elements.val(value);
