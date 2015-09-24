@@ -100,7 +100,7 @@ define(function (require) {
           .fillElement('[name="scmAccounts"]:first', 'scm5')
           .fillElement('[name="scmAccounts"]:last', 'scm6')
           .clickElement('#create-user-submit')
-          .waitForDeletedByCssSelector('#create-user-form')
+          .checkElementNotExist('#create-user-form')
           .checkElementInclude('[data-login="smith"] .js-user-login', 'smith')
           .checkElementInclude('[data-login="smith"] .js-user-name', 'Mike')
           .checkElementInclude('[data-login="smith"] .js-user-email', 'mike@example.com');
@@ -122,7 +122,7 @@ define(function (require) {
           .fillElement('#change-user-password-password', 'secret')
           .fillElement('#change-user-password-password-confirmation', 'secret')
           .clickElement('#change-user-password-submit')
-          .waitForDeletedByCssSelector('#change-user-password-form');
+          .checkElementNotExist('#change-user-password-form');
     });
 
     bdd.it('should deactivate a user', function () {
@@ -135,7 +135,7 @@ define(function (require) {
           .clearMocks()
           .mockFromString('/api/users/deactivate', '{}')
           .clickElement('#deactivate-user-submit')
-          .waitForDeletedByCssSelector('[data-login="smith"]');
+          .checkElementNotExist('[data-login="smith"]');
     });
   });
 

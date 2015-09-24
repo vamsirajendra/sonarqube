@@ -11,8 +11,8 @@ define(function (require) {
     return new this.constructor(this, function () {
       return this.parent
           .then(pollUntil(function (selector, count) {
-            var elements = document.querySelectorAll(selector);
-            return elements.length === count ? true : null;
+            var elements = jQuery(selector);
+            return elements.size() === count ? true : null;
           }, [selector, count], DEFAULT_TIMEOUT))
           .then(function () {
 
@@ -26,8 +26,8 @@ define(function (require) {
     return new this.constructor(this, function () {
       return this.parent
           .then(pollUntil(function (selector) {
-            var elements = document.querySelectorAll(selector);
-            return elements.length > 0 ? true : null;
+            var elements = jQuery(selector);
+            return elements.size() > 0 ? true : null;
           }, [selector], DEFAULT_TIMEOUT))
           .then(function () {
 
@@ -41,23 +41,8 @@ define(function (require) {
     return new this.constructor(this, function () {
       return this.parent
           .then(pollUntil(function (selector) {
-            var elements = document.querySelectorAll(selector);
-            return elements.length === 0 ? true : null;
-          }, [selector], DEFAULT_TIMEOUT))
-          .then(function () {
-
-          }, function () {
-            assert.fail(null, null, 'failed to fail to find elements by selector "' + selector + '"');
-          });
-    });
-  };
-
-  Command.prototype.waitForDeletedByCssSelector = function (selector) {
-    return new this.constructor(this, function () {
-      return this.parent
-          .then(pollUntil(function (selector) {
-            var elements = document.querySelectorAll(selector);
-            return elements.length === 0 ? true : null;
+            var elements = jQuery(selector);
+            return elements.size() === 0 ? true : null;
           }, [selector], DEFAULT_TIMEOUT))
           .then(function () {
 
