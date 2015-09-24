@@ -16,8 +16,8 @@ define(function (require) {
           }, [selector, count], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to find ' + count + ' elements by selector "' + selector + '"');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to find ' + count + ' elements by selector "' + selector + '". Cause: ' + cause);
           });
     });
   };
@@ -31,8 +31,8 @@ define(function (require) {
           }, [selector], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to find elements by selector "' + selector + '"');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to find elements by selector "' + selector + '". Cause: ' + cause);
           });
     });
   };
@@ -46,8 +46,8 @@ define(function (require) {
           }, [selector], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to fail to find elements by selector "' + selector + '"');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to fail to find elements by selector "' + selector + '". Cause: ' + cause);
           });
     });
   };
@@ -64,9 +64,9 @@ define(function (require) {
           }, [selector, text], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
+          }, function (cause) {
             assert.fail(null, null, 'failed to find elements by selector "' + selector +
-                '" that include "' + text + '"');
+                '" that include "' + text + '". Cause: ' + cause);
           });
     });
   };
@@ -83,9 +83,9 @@ define(function (require) {
           }, [selector, text], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
+          }, function (cause) {
             assert.fail(null, null, 'failed to fail to find elements by selector "' + selector +
-                '" that include "' + text + '"');
+                '" that include "' + text + '". Cause: ' + cause);
           });
     });
   };
@@ -104,8 +104,8 @@ define(function (require) {
           }, [selector], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to click by selector "' + selector + '"');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to click by selector "' + selector + '". Cause: ' + cause);
           });
     });
   };
@@ -124,8 +124,8 @@ define(function (require) {
           }, [selector], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to mouseUp by selector "' + selector + '"');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to mouseUp by selector "' + selector + '". Cause: ' + cause);
           });
     });
   };
@@ -144,8 +144,8 @@ define(function (require) {
           }, [selector, what], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to trigger by selector "' + selector + '"');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to trigger by selector "' + selector + '". Cause: ' + cause);
           });
     });
   };
@@ -164,8 +164,8 @@ define(function (require) {
           }, [selector], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to change elements by selector "' + selector + '"');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to change elements by selector "' + selector + '". Cause: ' + cause);
           });
     });
   };
@@ -184,8 +184,8 @@ define(function (require) {
           }, [selector, value], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to fill elements by selector "' + selector + '"');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to fill elements by selector "' + selector + '". Cause: ' + cause);
           });
     });
   };
@@ -274,8 +274,8 @@ define(function (require) {
           }, [count], DEFAULT_TIMEOUT))
           .then(function () {
 
-          }, function () {
-            assert.fail(null, null, 'failed to wait for completion of ' + count + ' queries');
+          }, function (cause) {
+            assert.fail(null, null, 'failed to wait for completion of ' + count + ' queries. Cause: ' + cause);
           });
     });
   };
