@@ -260,9 +260,7 @@ define(function (require) {
     return new this.constructor(this, function () {
       var initialQueriesCount = 0;
       // TEMP
-      if (app === 'issues') {
-        initialQueriesCount = 1;
-      } else if ((app === 'users') || (app === 'update-center') || (app === 'computation') || (app === 'custom-measures')) {
+      if ((app === 'issues') || (app === 'users') || (app === 'update-center') || (app === 'computation') || (app === 'custom-measures')) {
         initialQueriesCount = 2;
       } else if ((app === 'coding-rules') || (app === 'quality-profiles') || (app === 'source-viewer') || (app === 'global-permissions') || (app === 'project-permissions')) {
         initialQueriesCount = 3;
