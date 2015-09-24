@@ -219,7 +219,14 @@ define(function (require) {
     return new this.constructor(this, function () {
       return this.parent
           .execute(function (url, response, options) {
-            return jQuery.mockjax(_.extend({ url: url, responseText: response }, options));
+            var afterComplete = function() {
+              if (typeof window.complete == 'undefined') {
+                window.complete = 1;
+              } else {
+                window.complete = window.complete + 1;
+              }
+            }
+            return jQuery.mockjax(_.extend({ url: url, responseText: response, onAfterComplete: afterComplete }, options));
           }, [url, response, options]);
     });
   };
@@ -228,7 +235,14 @@ define(function (require) {
     return new this.constructor(this, function () {
       return this.parent
           .execute(function (url, response, options) {
-            return jQuery.mockjax(_.extend({ url: url, responseText: response }, options));
+            var afterComplete = function() {
+              if (typeof window.complete == 'undefined') {
+                window.complete = 1;
+              } else {
+                window.complete = window.complete + 1;
+              }
+            }
+            return jQuery.mockjax(_.extend({ url: url, responseText: response, onAfterComplete: afterComplete }, options));
           }, [url, response, options]);
     });
   };
@@ -244,14 +258,65 @@ define(function (require) {
 
   Command.prototype.startApp = function (app, options) {
     return new this.constructor(this, function () {
-      return this.parent
+      var promise = this.parent
           .execute(function (app, options) {
             require(['apps/' + app + '/app'], function (App) {
               App.start(_.extend({ el: '#content' }, options));
             });
-          }, [app, options]).sleep(1000);
+          }, [app, options]);
+
+          // TEMP
+          if (app === 'issues') {
+            promise = promise.waitForCompletion(1);
+          }
+          if (app === 'users') {
+            promise = promise.waitForCompletion(2);
+          }
+          if (app === 'update-center') {
+            promise = promise.waitForCompletion(2);
+          }
+          if (app === 'computation') {
+            promise = promise.waitForCompletion(2);
+          }
+          if (app === 'coding-rules') {
+            promise = promise.waitForCompletion(3);
+          }
+          if (app === 'custom-measures') {
+            promise = promise.waitForCompletion(2);
+          }
+          if (app === 'quality-profiles') {
+            promise = promise.waitForCompletion(3);
+          }
+          if (app === 'source-viewer') {
+            promise = promise.waitForCompletion(3);
+          }
+          if (app === 'global-permissions') {
+            promise = promise.waitForCompletion(3);
+          }
+          if (app === 'project-permissions') {
+            promise = promise.waitForCompletion(3);
+          }
+      return promise;
     });
   };
+
+  Command.prototype.waitForCompletion = function (count) {
+    return new this.constructor(this, function () {
+      return this.parent
+          .then(pollUntil(function (count) {
+            if (window.complete >= count) {
+              return true;
+            }
+            return null;
+          }, [count], DEFAULT_TIMEOUT))
+          .then(function () {
+
+          }, function () {
+            assert.fail(null, null, 'failed to wait for completion of ' + count + ' queries');
+          });
+    });
+  };
+
 
   Command.prototype.open = function (hash) {
     var url = 'test/medium/base.html?' + Date.now();
