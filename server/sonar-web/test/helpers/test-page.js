@@ -258,24 +258,23 @@ define(function (require) {
 
   Command.prototype.startApp = function (app, options) {
     return new this.constructor(this, function () {
-      var promise = this.parent
+      var initialQueriesCount = 0;
+      // TEMP
+      if (app === 'issues') {
+        initialQueriesCount = 1;
+      } else if ((app === 'users') || (app === 'update-center') || (app === 'computation') || (app === 'custom-measures')) {
+        initialQueriesCount = 2;
+      } else if ((app === 'coding-rules') || (app === 'quality-profiles') || (app === 'source-viewer') || (app === 'global-permissions') || (app === 'project-permissions')) {
+        initialQueriesCount = 3;
+      }
+
+      return this.parent
           .execute(function (app, options) {
             require(['apps/' + app + '/app'], function (App) {
               App.start(_.extend({ el: '#content' }, options));
             });
-          }, [app, options]);
-
-          // TEMP
-          if (app === 'issues') {
-            promise = promise.waitForCompletion(1);
-          }
-          if ((app === 'users') || (app === 'update-center') || (app === 'computation') || (app === 'custom-measures')) {
-            promise = promise.waitForCompletion(1);
-          }
-          if ((app === 'coding-rules') || (app === 'quality-profiles') || (app === 'source-viewer') || (app === 'global-permissions') || (app === 'project-permissions')) {
-            promise = promise.waitForCompletion(3);
-          }
-      return promise;
+          }, [app, options])
+          .waitForCompletion(initialQueriesCount);
     });
   };
 
@@ -295,7 +294,6 @@ define(function (require) {
           });
     });
   };
-
 
   Command.prototype.open = function (hash) {
     var url = 'test/medium/base.html?' + Date.now();
