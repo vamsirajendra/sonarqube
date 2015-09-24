@@ -19,7 +19,6 @@ define(function (require) {
             bdd.it('should load a saved search', function () {
                 return this.remote
                     .open()
-                    .mockFromString('/api/l10n/index', '{}')
                     .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                     .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                     .mockFromFile('/api/issues/search', 'issues-spec/search.json')
@@ -35,7 +34,6 @@ define(function (require) {
             bdd.it('should load a saved search and then resets it by new search', function () {
                 return this.remote
                     .open()
-                    .mockFromString('/api/l10n/index', '{}')
                     .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                     .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                     .mockFromFile('/api/issues/search', 'issues-spec/search.json')
@@ -55,7 +53,6 @@ define(function (require) {
         bdd.it('should load', function () {
             return this.remote
                 .open('#resolved=false')
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 .mockFromFile('/api/issues/search', 'issues-spec/search.json')
@@ -94,7 +91,6 @@ define(function (require) {
         bdd.it('should show severity facet', function () {
             return this.remote
                 .open('#resolved=false')
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 .mockFromFile('/api/issues/search', 'issues-spec/search.json')
@@ -112,7 +108,6 @@ define(function (require) {
 
             return this.remote
                 .open('#resolved=false')
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 .mockFromFile('/api/issues/search', 'issues-spec/search.json')
@@ -136,7 +131,6 @@ define(function (require) {
         bdd.it('should bulk change issues', function () {
             return this.remote
                 .open('#resolved=false')
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 .mockFromFile('/api/issues/search', 'issues-spec/search.json')
@@ -155,7 +149,6 @@ define(function (require) {
 
             return this.remote
                 .open('#resolved=false')
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 .mockFromFile('/api/issues/search', 'issues-spec/search.json')
@@ -185,7 +178,6 @@ define(function (require) {
         bdd.it('should filter similar issues', function () {
             return this.remote
                 .open('#resolved=false')
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 .mockFromFile('/api/issues/search', 'issues-spec/search-filter-similar-issues.json')
@@ -216,7 +208,6 @@ define(function (require) {
 
             return this.remote
                 .open('#issues=' + issueKey)
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-page-should-open-issue-permalink/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 //.mockFromString('/api/issues/search', '{}', { data: { issues: issueKey, p: 2 } })
@@ -233,7 +224,6 @@ define(function (require) {
         bdd.it('should open closed facet', function () {
             return this.remote
                 .open()
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 .mockFromFile('/api/issues/search', 'issues-spec/search-rules-facet.json', { data: { facets: 'rules' } })
@@ -247,7 +237,6 @@ define(function (require) {
         bdd.it('should open comment form after FP or WF transition', function () {
             return this.remote
                 .open('#resolved=false')
-                .mockFromString('/api/l10n/index', '{}')
                 .mockFromFile('/api/issue_filters/app', 'issues-spec/app.json')
                 .mockFromFile('/api/issue_filters/search', 'issues-spec/issue-filters.json')
                 .mockFromFile('/api/issues/search', 'issues-spec/search.json')

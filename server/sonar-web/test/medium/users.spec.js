@@ -6,7 +6,6 @@ define(function (require) {
     bdd.it('should show list of users', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
           .checkElementCount('#users-list li[data-login]', 3)
@@ -28,7 +27,6 @@ define(function (require) {
     bdd.it('should search users', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
           .checkElementCount('#users-list li[data-login]', 3)
@@ -49,7 +47,6 @@ define(function (require) {
     bdd.it('should show more', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search-big-1.json')
           .startApp('users')
           .checkElementCount('#users-list li[data-login]', 2)
@@ -63,7 +60,6 @@ define(function (require) {
     bdd.it('should create a new user', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
           .checkElementCount('#users-list li[data-login]', 3)
@@ -91,7 +87,6 @@ define(function (require) {
     bdd.it('should update a user', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
           .clickElement('[data-login="smith"] .js-user-update')
@@ -114,7 +109,6 @@ define(function (require) {
     bdd.it('should change user\'s password', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
           .clickElement('[data-login="smith"] .js-user-change-password')
@@ -134,7 +128,6 @@ define(function (require) {
     bdd.it('should deactivate a user', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/users/search', 'users-spec/search.json')
           .startApp('users')
           .clickElement('[data-login="smith"] .js-user-deactivate')

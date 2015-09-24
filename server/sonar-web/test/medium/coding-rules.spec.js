@@ -10,7 +10,6 @@ define(function (require) {
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app-no-available-profiles.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-no-available-profiles.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-no-available-profiles.json')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .checkElementExist('.coding-rule.selected')
           .clickElement('.coding-rule.selected .js-rule')
@@ -77,7 +76,6 @@ define(function (require) {
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show.json')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .checkElementExist('.coding-rule.selected')
           .clickElement('.coding-rule.selected .js-rule')
@@ -92,7 +90,6 @@ define(function (require) {
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-activate-profile.json')
           .mockFromString('/api/qualityprofiles/activate_rule', '{}')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .checkElementExist('.coding-rule.selected')
           .clickElement('.coding-rule.selected .js-rule')
@@ -104,7 +101,6 @@ define(function (require) {
           .clearMocks()
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-activate-profile-with-profile.json')
           .mockFromString('/api/qualityprofiles/activate_rule', '{}')
-          .mockFromString('/api/issues/search', '{}')
           .clickElement('#coding-rules-quality-profile-activation-activate')
           .checkElementExist('.coding-rules-detail-quality-profile-name')
           .checkElementExist('.coding-rules-detail-quality-profile-name')
@@ -124,7 +120,6 @@ define(function (require) {
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-custom-rules.json',
           { data: { template_key: 'squid:ArchitecturalConstraint' } })
           .mockFromString('/api/rules/create', '{}')
-          .mockFromString('/api/issues/search', '{}')
           .clickElement('.coding-rule.selected .js-rule')
           .checkElementExist('#coding-rules-detail-custom-rules .coding-rules-detail-list-name')
           .clearMocks()
@@ -152,7 +147,6 @@ define(function (require) {
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-custom-rules.json',
           { data: { template_key: 'squid:ArchitecturalConstraint' } })
           .mockFromFile('/api/rules/create', 'coding-rules-spec/create-create-custom-rules.json', { status: 409 })
-          .mockFromString('/api/issues/search', '{}')
           .clickElement('.coding-rule.selected .js-rule')
           .checkElementExist('.js-create-custom-rule')
           .clickElement('.js-create-custom-rule')
@@ -178,7 +172,6 @@ define(function (require) {
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-create-manual-rule.json')
           .mockFromFile('/api/rules/create', 'coding-rules-spec/show-create-manual-rule.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-create-manual-rule.json')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .forceJSON()
           .checkElementExist('.js-create-manual-rule')
@@ -200,7 +193,6 @@ define(function (require) {
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-create-manual-rule.json')
           .mockFromFile('/api/rules/create', 'coding-rules-spec/show-create-manual-rule.json', { status: 409 })
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-create-manual-rule.json')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .forceJSON()
           .checkElementExist('.js-create-manual-rule')
@@ -230,7 +222,6 @@ define(function (require) {
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-delete-custom-rule.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-delete-custom-rule.json')
           .mockFromString('/api/rules/delete', '{}')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .checkElementExist('.coding-rule.selected')
           .clickElement('.coding-rule.selected .js-rule')
@@ -247,7 +238,6 @@ define(function (require) {
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-delete-manual-rule-before.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-delete-manual-rule.json')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .forceJSON()
           .checkElementExist('.coding-rule.selected')
@@ -270,7 +260,6 @@ define(function (require) {
           { data: { template_key: 'squid:ArchitecturalConstraint' } })
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-show-cutsom-rule.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-show-cutsom-rule.json')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .checkElementExist('.coding-rule.selected')
           .clickElement('.coding-rule.selected .js-rule')
@@ -297,7 +286,6 @@ define(function (require) {
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-show-details.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show-show-details.json')
-          .mockFromString('/api/issues/search', '{}')
           .startApp('coding-rules')
           .checkElementExist('.coding-rule.selected')
           .clickElement('.coding-rule.selected .js-rule')
@@ -582,7 +570,6 @@ define(function (require) {
     bdd.it('should show characteristic facet', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .startApp('coding-rules')
@@ -615,7 +602,6 @@ define(function (require) {
     bdd.it('should disable characteristic facet', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .startApp('coding-rules')
@@ -677,7 +663,6 @@ define(function (require) {
     bdd.it('should show template facet', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .startApp('coding-rules')
@@ -708,7 +693,6 @@ define(function (require) {
     // bdd.it('should show language facet', function () {
     //   return this.remote
     //       .open()
-    //       .mockFromString('/api/l10n/index', '{}')
     //       .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
     //       .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
     //       .mockFromString('/api/languages/list', '{"languages":[{"key":"custom","name":"Custom"}]}',
@@ -734,7 +718,6 @@ define(function (require) {
     bdd.it('should reload results', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .startApp('coding-rules')
@@ -749,7 +732,6 @@ define(function (require) {
     bdd.it('should do a new search', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .startApp('coding-rules')
@@ -768,7 +750,6 @@ define(function (require) {
     bdd.it('should go back', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .mockFromFile('/api/rules/show', 'coding-rules-spec/show.json')
@@ -839,7 +820,6 @@ define(function (require) {
     bdd.it('should show activation details', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .startApp('coding-rules')
@@ -859,7 +839,6 @@ define(function (require) {
     bdd.it('should activate rule', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-inactive.json',
           { data: { activation: 'false' } })
@@ -889,7 +868,6 @@ define(function (require) {
     bdd.it('should deactivate rule', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .startApp('coding-rules')
@@ -915,7 +893,6 @@ define(function (require) {
     bdd.it('should deactivate just activated rule', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search-inactive.json',
           { data: { activation: 'false' } })
@@ -966,7 +943,6 @@ define(function (require) {
     bdd.it('should pre-select context profile in the activation modal', function () {
       return this.remote
           .open()
-          .mockFromString('/api/l10n/index', '{}')
           .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
           .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
           .startApp('coding-rules')
