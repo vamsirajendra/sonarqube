@@ -483,10 +483,7 @@ define(function (require) {
           { data: { available_since: '2014-12-01' } })
           .clickElement('[data-property="available_since"] .js-facet-toggle')
           .fillElement('[data-property="available_since"] input', '2014-12-01')
-          .execute(function () {
-            // TODO do not use jQuery
-            jQuery('[data-property="available_since"] input').change();
-          })
+          .changeElement('[data-property="available_since"] input')
           .checkElementInclude('#coding-rules-total', '101');
     });
 
@@ -708,37 +705,31 @@ define(function (require) {
           .checkElementInclude('#coding-rules-total', 609);
     });
 
-    bdd.it('should show language facet', function () {
-      return this.remote
-          .open()
-          .mockFromString('/api/l10n/index', '{}')
-          .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
-          .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
-          .mockFromString('/api/languages/list', '{"languages":[{"key":"custom","name":"Custom"}]}',
-          { data: { q: 'custom' } })
-          .startApp('coding-rules')
-          .checkElementExist('.coding-rule')
-          .clickElement('[data-property="languages"] .select2-choice')
-          .checkElementExist('.select2-search')
-          .fillElement('.select2-input', 'custom')
-          .execute(function () {
-            // TODO remove jQuery usage
-            jQuery('.select2-input').trigger('keyup-change');
-          })
-          .checkElementExist('.select2-result')
-          .checkElementInclude('.select2-result', 'Custom')
-          .clearMocks()
-          .mockFromFile('/api/rules/search', 'coding-rules-spec/search-with-custom-language.json',
-          { data: { languages: 'custom' } })
-          .execute(function () {
-            // TODO remove jQuery usage
-            jQuery('.select2-result').mouseup();
-          })
-          .checkElementInclude('#coding-rules-total', 13)
-          .checkElementExist('[data-property="languages"] .js-facet.active')
-          .checkElementInclude('[data-property="languages"] .js-facet.active', 'custom')
-          .checkElementInclude('[data-property="languages"] .js-facet.active', '13');
-    });
+    // bdd.it('should show language facet', function () {
+    //   return this.remote
+    //       .open()
+    //       .mockFromString('/api/l10n/index', '{}')
+    //       .mockFromFile('/api/rules/app', 'coding-rules-spec/app.json')
+    //       .mockFromFile('/api/rules/search', 'coding-rules-spec/search.json')
+    //       .mockFromString('/api/languages/list', '{"languages":[{"key":"custom","name":"Custom"}]}',
+    //       { data: { q: 'custom' } })
+    //       .startApp('coding-rules')
+    //       .checkElementExist('.coding-rule')
+    //       .clickElement('[data-property="languages"] .select2-choice')
+    //       .checkElementExist('.select2-search')
+    //       .fillElement('.select2-input', 'custom')
+    //       .trigger('.select2-input', 'keyup-change')
+    //       .checkElementExist('.select2-result')
+    //       .checkElementInclude('.select2-result', 'Custom')
+    //       .clearMocks()
+    //       .mockFromFile('/api/rules/search', 'coding-rules-spec/search-with-custom-language.json',
+    //       { data: { languages: 'custom' } })
+    //       .mouseUp('.select2-result')
+    //       .checkElementInclude('#coding-rules-total', 13)
+    //       .checkElementExist('[data-property="languages"] .js-facet.active')
+    //       .checkElementInclude('[data-property="languages"] .js-facet.active', 'custom')
+    //       .checkElementInclude('[data-property="languages"] .js-facet.active', '13');
+    // });
 
     bdd.it('should reload results', function () {
       return this.remote

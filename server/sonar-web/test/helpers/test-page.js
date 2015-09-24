@@ -52,6 +52,21 @@ define(function (require) {
     });
   };
 
+  Command.prototype.waitForDeletedByCssSelector = function (selector) {
+    return new this.constructor(this, function () {
+      return this.parent
+          .then(pollUntil(function (selector) {
+            var elements = document.querySelectorAll(selector);
+            return elements.length === 0 ? true : null;
+          }, [selector], DEFAULT_TIMEOUT))
+          .then(function () {
+
+          }, function () {
+            assert.fail(null, null, 'failed to fail to find elements by selector "' + selector + '"');
+          });
+    });
+  };
+
   Command.prototype.checkElementInclude = function (selector, text) {
     return new this.constructor(this, function () {
       return this.parent
@@ -93,30 +108,100 @@ define(function (require) {
   Command.prototype.clickElement = function (selector) {
     return new this.constructor(this, function () {
       return this.parent
-          .checkElementExist(selector)
-          .sleep(250)
-          .findByCssSelector(selector)
-          .click()
-          .end()
-          .sleep(250);
+          .then(pollUntil(function (selector) {
+            var elements = jQuery(selector);
+            if (elements.size() === 0) {
+              return undefined;
+            }
+
+            var result = elements.first().click();
+            return true;
+          }, [selector], DEFAULT_TIMEOUT))
+          .then(function () {
+
+          }, function () {
+            assert.fail(null, null, 'failed to click by selector "' + selector + '"');
+          });
     });
   };
 
-  Command.prototype.fillElement = function (selector, value) {
+  Command.prototype.mouseUp = function (selector) {
     return new this.constructor(this, function () {
       return this.parent
-          .execute(function (selector, value) {
-            jQuery(selector).val(value);
-          }, [selector, value]);
+          .then(pollUntil(function (selector) {
+            var elements = jQuery(selector);
+            if (elements.size() === 0) {
+              return undefined;
+            }
+
+            elements.mouseup();
+            return true;
+          }, [selector], DEFAULT_TIMEOUT))
+          .then(function () {
+
+          }, function () {
+            assert.fail(null, null, 'failed to mouseUp by selector "' + selector + '"');
+          });
+    });
+  };
+
+  Command.prototype.trigger = function (selector, what) {
+    return new this.constructor(this, function () {
+      return this.parent
+          .then(pollUntil(function (selector, what) {
+            var elements = jQuery(selector);
+            if (elements.size() === 0) {
+              return undefined;
+            }
+
+            elements.trigger(what);
+            return true;
+          }, [selector, what], DEFAULT_TIMEOUT))
+          .then(function () {
+
+          }, function () {
+            assert.fail(null, null, 'failed to trigger by selector "' + selector + '"');
+          });
     });
   };
 
   Command.prototype.changeElement = function (selector) {
     return new this.constructor(this, function () {
       return this.parent
-          .execute(function (selector) {
-            jQuery(selector).change();
-          }, [selector]);
+          .then(pollUntil(function (selector) {
+            var elements = jQuery(selector);
+            if (elements.size() === 0) {
+              return undefined;
+            }
+
+            elements.change();
+            return true;
+          }, [selector], DEFAULT_TIMEOUT))
+          .then(function () {
+
+          }, function () {
+            assert.fail(null, null, 'failed to change elements by selector "' + selector + '"');
+          });
+    });
+  };
+
+  Command.prototype.fillElement = function (selector, value) {
+    return new this.constructor(this, function () {
+      return this.parent
+          .then(pollUntil(function (selector, value) {
+            var elements = jQuery(selector);
+            if (elements.size() === 0) {
+              return undefined;
+            }
+
+            elements.val(value);
+            return true;
+          }, [selector, value], DEFAULT_TIMEOUT))
+          .then(function () {
+
+          }, function () {
+            assert.fail(null, null, 'failed to fill elements by selector "' + selector + '"');
+          });
     });
   };
 
@@ -164,8 +249,7 @@ define(function (require) {
             require(['apps/' + app + '/app'], function (App) {
               App.start(_.extend({ el: '#content' }, options));
             });
-          }, [app, options])
-          .sleep(1000);
+          }, [app, options]).sleep(1000);
     });
   };
 
