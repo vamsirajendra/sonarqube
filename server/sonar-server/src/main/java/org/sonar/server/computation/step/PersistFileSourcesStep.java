@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.CheckForNull;
+import javax.annotation.Nullable;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.ibatis.session.ResultContext;
 import org.apache.ibatis.session.ResultHandler;
@@ -116,7 +118,7 @@ public class PersistFileSourcesStep implements ComputationStep {
       try {
         ComputeFileSourceData computeFileSourceData = new ComputeFileSourceData(linesIterator, lineReaders.readers(), component.getLines());
         ComputeFileSourceData.Data fileSourceData = computeFileSourceData.compute();
-        persistSource(fileSourceData, file.getUuid());
+        persistSource(fileSourceData, file.getUuid(), lineReaders.getLatestChange());
       } catch (Exception e) {
         throw new IllegalStateException(String.format("Cannot persist sources of %s", file.getKey()), e);
       } finally {
@@ -125,7 +127,8 @@ public class PersistFileSourcesStep implements ComputationStep {
       }
     }
 
-    private void persistSource(ComputeFileSourceData.Data fileSourceData, String componentUuid) {
+    private void persistSource(ComputeFileSourceData.Data fileSourceData, String componentUuid,
+      @Nullable BatchReport.Changesets.Changeset latestChange) {
       DbFileSources.Data fileData = fileSourceData.getFileSourceData();
 
       byte[] data = FileSourceDto.encodeSourceData(fileData);
@@ -144,7 +147,8 @@ public class PersistFileSourcesStep implements ComputationStep {
           .setDataHash(dataHash)
           .setLineHashes(lineHashes)
           .setCreatedAt(system2.now())
-          .setUpdatedAt(system2.now());
+          .setUpdatedAt(system2.now())
+          .setRevision(computeRevision(latestChange));
         dbClient.fileSourceDao().insert(session, dto);
         session.commit();
       } else {
@@ -156,7 +160,8 @@ public class PersistFileSourcesStep implements ComputationStep {
             .setBinaryData(data)
             .setDataHash(dataHash)
             .setSrcHash(srcHash)
-            .setLineHashes(lineHashes);
+            .setLineHashes(lineHashes)
+            .setRevision(computeRevision(previousDto, latestChange));
           // Optimization only change updated at when updating binary data to avoid unnecessary indexation by E/S
           if (binaryDataUpdated) {
             previousDto.setUpdatedAt(system2.now());
@@ -168,9 +173,27 @@ public class PersistFileSourcesStep implements ComputationStep {
     }
   }
 
+  @CheckForNull
+  private static String computeRevision(FileSourceDto previousDto, @Nullable BatchReport.Changesets.Changeset latestChange) {
+    if (latestChange == null) {
+      return previousDto.getRevision();
+    }
+    return latestChange.getRevision();
+  }
+
+  @CheckForNull
+  private static String computeRevision(@Nullable BatchReport.Changesets.Changeset latestChange) {
+    if (latestChange == null) {
+      return null;
+    }
+    return latestChange.getRevision();
+  }
+
   private static class LineReaders {
     private final List<LineReader> readers = new ArrayList<>();
     private final List<CloseableIterator<?>> closeables = new ArrayList<>();
+    @CheckForNull
+    private final ScmLineReader scmLineReader;
 
     LineReaders(BatchReportReader reportReader, int componentRef) {
       CloseableIterator<BatchReport.Coverage> coverageIt = reportReader.readComponentCoverage(componentRef);
@@ -179,7 +202,10 @@ public class PersistFileSourcesStep implements ComputationStep {
 
       BatchReport.Changesets scmReport = reportReader.readChangesets(componentRef);
       if (scmReport != null) {
-        readers.add(new ScmLineReader(scmReport));
+        this.scmLineReader = new ScmLineReader(scmReport);
+        readers.add(scmLineReader);
+      } else {
+        this.scmLineReader = null;
       }
 
       CloseableIterator<BatchReport.SyntaxHighlighting> highlightingIt = reportReader.readComponentSyntaxHighlighting(componentRef);
@@ -203,6 +229,14 @@ public class PersistFileSourcesStep implements ComputationStep {
       for (CloseableIterator<?> reportIterator : closeables) {
         reportIterator.close();
       }
+    }
+
+    @CheckForNull
+    public BatchReport.Changesets.Changeset getLatestChange() {
+      if (scmLineReader == null) {
+        return null;
+      }
+      return scmLineReader.getLatestChange();
     }
   }
 
