@@ -3856,7 +3856,6 @@ public final class WsCe {
      * <code>optional bool logs = 13;</code>
      */
     boolean hasLogs();
-
     /**
      * <code>optional bool logs = 13;</code>
      */
@@ -4448,14 +4447,12 @@ public final class WsCe {
 
     public static final int LOGS_FIELD_NUMBER = 13;
     private boolean logs_;
-
     /**
      * <code>optional bool logs = 13;</code>
      */
     public boolean hasLogs() {
       return ((bitField0_ & 0x00001000) == 0x00001000);
     }
-
     /**
      * <code>optional bool logs = 13;</code>
      */
@@ -5674,22 +5671,19 @@ public final class WsCe {
         return this;
       }
 
-      private boolean logs_;
-
+      private boolean logs_ ;
       /**
        * <code>optional bool logs = 13;</code>
        */
       public boolean hasLogs() {
         return ((bitField0_ & 0x00001000) == 0x00001000);
       }
-
       /**
        * <code>optional bool logs = 13;</code>
        */
       public boolean getLogs() {
         return logs_;
       }
-
       /**
        * <code>optional bool logs = 13;</code>
        */
@@ -5699,7 +5693,6 @@ public final class WsCe {
         onChanged();
         return this;
       }
-
       /**
        * <code>optional bool logs = 13;</code>
        */
@@ -5809,9 +5802,9 @@ public final class WsCe {
       "submittedAt\030\007 \001(\t\022\026\n\016submitterLogin\030\010 \001(" +
       "\t\022\021\n\tstartedAt\030\t \001(\t\022\022\n\nfinishedAt\030\n \001(\t" +
       "\022\026\n\016isLastFinished\030\013 \001(\010\022\027\n\017executionTim" +
-        "eMs\030\014 \001(\003\022\014\n\004logs\030\r \001(\010*Q\n\nTaskStatus\022\013\n" +
-        "\007PENDING\020\000\022\017\n\013IN_PROGRESS\020\001\022\013\n\007SUCCESS\020\002" +
-        "\022\n\n\006FAILED\020\003\022\014\n\010CANCELED\020\004B\032\n\020org.sonarq",
+      "eMs\030\014 \001(\003\022\014\n\004logs\030\r \001(\010*Q\n\nTaskStatus\022\013\n" +
+      "\007PENDING\020\000\022\017\n\013IN_PROGRESS\020\001\022\013\n\007SUCCESS\020\002" +
+      "\022\n\n\006FAILED\020\003\022\014\n\010CANCELED\020\004B\032\n\020org.sonarq",
       "ube.wsB\004WsCeH\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
@@ -5862,8 +5855,7 @@ public final class WsCe {
     internal_static_sonarqube_ws_ce_Task_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessage.FieldAccessorTable(
         internal_static_sonarqube_ws_ce_Task_descriptor,
-      new java.lang.String[] {"Id", "Type", "ComponentId", "ComponentKey", "ComponentName", "Status", "SubmittedAt", "SubmitterLogin", "StartedAt", "FinishedAt", "IsLastFinished",
-        "ExecutionTimeMs", "Logs",});
+        new java.lang.String[] { "Id", "Type", "ComponentId", "ComponentKey", "ComponentName", "Status", "SubmittedAt", "SubmitterLogin", "StartedAt", "FinishedAt", "IsLastFinished", "ExecutionTimeMs", "Logs", });
     org.sonarqube.ws.Common.getDescriptor();
   }
 
