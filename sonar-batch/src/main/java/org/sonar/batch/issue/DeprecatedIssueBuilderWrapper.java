@@ -84,6 +84,12 @@ public class DeprecatedIssueBuilderWrapper implements Issuable.IssueBuilder {
   }
 
   @Override
+  public IssueBuilder addLocation(NewIssueLocation secondaryLocation) {
+    newIssue.addLocation(secondaryLocation);
+    return this;
+  }
+
+  @Override
   public IssueBuilder addFlow(Iterable<NewIssueLocation> flowLocations) {
     newIssue.addFlow(flowLocations);
     return this;
@@ -108,7 +114,7 @@ public class DeprecatedIssueBuilderWrapper implements Issuable.IssueBuilder {
 
   @Override
   public IssueBuilder attribute(String key, String value) {
-    throw new UnsupportedOperationException("Unused");
+    throw new UnsupportedOperationException("Not supported during sensor phase");
   }
 
   @Override

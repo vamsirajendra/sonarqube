@@ -1,10 +1,10 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/issues-filters.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['issues-filters'],
+  template: Template,
 
   events: {
     'click .js-toggle-filters': 'toggleFilters',
@@ -19,6 +19,7 @@ export default Marionette.ItemView.extend({
     var that = this;
     this.listenTo(options.app.state, 'change:filter', this.render);
     this.listenTo(options.app.state, 'change:changed', this.render);
+    this.listenTo(options.app.state, 'change:canManageFilters', this.render);
     this.listenTo(options.app.filters, 'reset', this.render);
     window.onSaveAs = window.onCopy = window.onEdit = function (id) {
       $('#modal').dialog('close');

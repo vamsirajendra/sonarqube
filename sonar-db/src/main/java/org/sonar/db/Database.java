@@ -36,4 +36,6 @@ public interface Database extends Startable {
    * @return the dialect or null if start() has not been executed
    */
   Dialect getDialect();
+
+  void enableSqlLogging(boolean enable);
 }

@@ -1,12 +1,8 @@
 import Marionette from 'backbone.marionette';
-import './templates';
-
-Handlebars.registerHelper('issueFilterHomeLink', function (id) {
-  return baseUrl + '/issues/search#id=' + id;
-});
+import Template from './templates/issues-workspace-home.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['issues-workspace-home']
+  template: Template
 });
 
 

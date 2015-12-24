@@ -1,12 +1,13 @@
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/quality-profile-comparison.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['quality-profile-comparison'],
+  template: Template,
 
   events: {
-    'submit #quality-profile-comparison-form': 'onFormSubmit'
+    'submit #quality-profile-comparison-form': 'onFormSubmit',
+    'click .js-hide-comparison': 'onHideComparisonClick'
   },
 
   onRender: function () {
@@ -20,6 +21,11 @@ export default Marionette.ItemView.extend({
     e.preventDefault();
     var withKey = this.$('#quality-profile-comparison-with-key').val();
     this.model.compareWith(withKey);
+  },
+
+  onHideComparisonClick: function (e) {
+    e.preventDefault();
+    this.model.resetComparison();
   },
 
   getProfilesForComparison: function () {

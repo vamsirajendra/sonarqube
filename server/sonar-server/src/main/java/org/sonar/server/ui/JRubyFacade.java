@@ -302,10 +302,6 @@ public final class JRubyFacade {
     return getJRubyI18n().message(rubyLocale, key, defaultValue, parameters);
   }
 
-  public void indexProjects() {
-    get(ResourceIndexDao.class).indexProjects();
-  }
-
   /*
    * /!\ Used by Views
    */
@@ -407,4 +403,12 @@ public final class JRubyFacade {
     Database database = container.getComponentByType(Database.class);
     return !database.getDialect().supportsMigration();
   }
+
+  /**
+   * Used by Developer Cockpit
+   */
+  public void indexResource(long resourceId) {
+    get(ResourceIndexDao.class).indexResource(resourceId);
+  }
+
 }

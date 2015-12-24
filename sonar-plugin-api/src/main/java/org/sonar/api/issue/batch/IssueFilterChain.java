@@ -29,7 +29,9 @@ import org.sonar.api.issue.Issue;
  *  <li>Let downstream filters decide by passing the issue to the rest of the chain</li>
  * </ul>
  * @since 4.0
+ * @deprecated since 5.3. Use {@link org.sonar.api.issue.filter.IssueFilterChain} instead.
  */
+@Deprecated
 public interface IssueFilterChain {
 
   /**

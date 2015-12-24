@@ -48,6 +48,7 @@ import org.sonar.server.permission.ws.PermissionDependenciesFinder;
 import org.sonar.server.platform.PersistentSettings;
 import org.sonar.server.platform.ServerSettings;
 import org.sonar.server.tester.UserSessionRule;
+import org.sonar.server.usergroups.ws.UserGroupFinder;
 import org.sonar.server.ws.TestRequest;
 import org.sonar.server.ws.WsActionTester;
 import org.sonar.test.DbTests;
@@ -61,9 +62,9 @@ import static org.sonar.api.resources.Qualifiers.PROJECT;
 import static org.sonar.api.resources.Qualifiers.VIEW;
 import static org.sonar.server.permission.DefaultPermissionTemplates.DEFAULT_TEMPLATE_PROPERTY;
 import static org.sonar.server.permission.DefaultPermissionTemplates.defaultRootQualifierTemplateProperty;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_QUALIFIER;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_TEMPLATE_UUID;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_TEMPLATE_NAME;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_QUALIFIER;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME;
 
 @Category(DbTests.class)
 public class SetDefaultTemplateActionTest {
@@ -94,7 +95,7 @@ public class SetDefaultTemplateActionTest {
 
     ws = new WsActionTester(new SetDefaultTemplateAction(
       dbClient,
-      new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient)),
+      new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient), new UserGroupFinder(dbClient), resourceTypes),
       resourceTypes,
       persistentSettings,
       userSession, i18n));
@@ -178,7 +179,7 @@ public class SetDefaultTemplateActionTest {
   private String newRequest(@Nullable String templateUuid, @Nullable String qualifier) {
     TestRequest request = ws.newRequest();
     if (templateUuid != null) {
-      request.setParam(PARAM_TEMPLATE_UUID, templateUuid);
+      request.setParam(PARAM_TEMPLATE_ID, templateUuid);
     }
     if (qualifier != null) {
       request.setParam(PARAM_QUALIFIER, qualifier);

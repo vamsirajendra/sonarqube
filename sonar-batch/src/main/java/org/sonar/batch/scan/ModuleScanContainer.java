@@ -22,11 +22,9 @@ package org.sonar.batch.scan;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonar.api.batch.InstantiationStrategy;
-import org.sonar.api.batch.ProjectClasspath;
 import org.sonar.api.batch.bootstrap.ProjectDefinition;
 import org.sonar.api.batch.fs.internal.FileMetadata;
 import org.sonar.api.batch.rule.CheckFactory;
-import org.sonar.api.checks.NoSonarFilter;
 import org.sonar.api.resources.Project;
 import org.sonar.api.scan.filesystem.FileExclusions;
 import org.sonar.batch.DefaultProjectTree;
@@ -68,7 +66,6 @@ import org.sonar.batch.scan.filesystem.InputFileBuilderFactory;
 import org.sonar.batch.scan.filesystem.LanguageDetectionFactory;
 import org.sonar.batch.scan.filesystem.ModuleFileSystemInitializer;
 import org.sonar.batch.scan.filesystem.ModuleInputFileCache;
-import org.sonar.batch.scan.filesystem.ProjectFileSystemAdapter;
 import org.sonar.batch.scan.filesystem.StatusDetectionFactory;
 import org.sonar.batch.scan.report.IssuesReports;
 import org.sonar.batch.sensor.DefaultSensorContext;
@@ -114,7 +111,6 @@ public class ModuleScanContainer extends ComponentContainer {
       SensorsExecutor.class,
       InitializersExecutor.class,
       ProjectInitializer.class,
-      moduleDefinition.getContainerExtensions(),
 
       // file system
       ModuleInputFileCache.class,
@@ -131,8 +127,6 @@ public class ModuleScanContainer extends ComponentContainer {
       FileSystemLogger.class,
       DefaultModuleFileSystem.class,
       ModuleFileSystemInitializer.class,
-      ProjectFileSystemAdapter.class,
-      ProjectClasspath.class,
       QProfileVerifier.class,
 
       SensorOptimizer.class,
@@ -166,7 +160,6 @@ public class ModuleScanContainer extends ComponentContainer {
       IssueExclusionsLoader.class,
       EnforceIssuesFilter.class,
       IgnoreIssuesFilter.class,
-      NoSonarFilter.class,
 
       // Perspectives
       BatchPerspectives.class,

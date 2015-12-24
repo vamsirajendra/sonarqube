@@ -20,26 +20,27 @@
 package org.sonar.batch.cache;
 
 import com.google.common.base.Function;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonar.api.utils.log.Loggers;
 import org.sonar.api.utils.log.Profiler;
 import org.sonar.batch.protocol.input.BatchInput.ServerIssue;
-import org.sonar.batch.protocol.input.QProfile;
-import org.sonar.batch.repository.ProjectSettingsLoader;
-import org.sonar.batch.repository.ProjectSettingsRepo;
+import org.sonar.batch.repository.ProjectRepositories;
+import org.sonar.batch.repository.ProjectRepositoriesLoader;
 import org.sonar.batch.repository.QualityProfileLoader;
 import org.sonar.batch.repository.ServerIssuesLoader;
 import org.sonar.batch.repository.user.UserRepositoryLoader;
 import org.sonar.batch.rule.ActiveRulesLoader;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import org.sonar.batch.rule.RulesLoader;
+import org.sonarqube.ws.QualityProfiles.SearchWsResponse.QualityProfile;
 
 public class ProjectCacheSynchronizer {
   private static final Logger LOG = LoggerFactory.getLogger(ProjectCacheSynchronizer.class);
@@ -48,82 +49,123 @@ public class ProjectCacheSynchronizer {
   private final UserRepositoryLoader userRepository;
   private final ProjectCacheStatus cacheStatus;
   private final QualityProfileLoader qualityProfileLoader;
-  private final ProjectSettingsLoader projectSettingsLoader;
+  private final ProjectRepositoriesLoader projectRepositoriesLoader;
   private final ActiveRulesLoader activeRulesLoader;
+  private final RulesLoader rulesLoader;
 
-  public ProjectCacheSynchronizer(QualityProfileLoader qualityProfileLoader, ProjectSettingsLoader projectSettingsLoader,
+  public ProjectCacheSynchronizer(RulesLoader rulesLoader, QualityProfileLoader qualityProfileLoader, ProjectRepositoriesLoader projectSettingsLoader,
     ActiveRulesLoader activeRulesLoader, ServerIssuesLoader issuesLoader,
     UserRepositoryLoader userRepository, ProjectCacheStatus cacheStatus) {
+    this.rulesLoader = rulesLoader;
     this.qualityProfileLoader = qualityProfileLoader;
-    this.projectSettingsLoader = projectSettingsLoader;
+    this.projectRepositoriesLoader = projectSettingsLoader;
     this.activeRulesLoader = activeRulesLoader;
     this.issuesLoader = issuesLoader;
     this.userRepository = userRepository;
     this.cacheStatus = cacheStatus;
   }
 
+  private static boolean isToday(Date d) {
+    Calendar c1 = Calendar.getInstance();
+    Calendar c2 = Calendar.getInstance();
+    c2.setTime(d);
+
+    return c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR) &&
+      c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR);
+  }
+
+  private static boolean shouldUpdate(Date lastUpdate) {
+    return !isToday(lastUpdate);
+  }
+
   public void load(String projectKey, boolean force) {
-    Date lastSync = cacheStatus.getSyncStatus(projectKey);
+    Date lastSync = cacheStatus.getSyncStatus();
+    boolean failOnError = true;
 
     if (lastSync != null) {
-      if (!force) {
+      if (force) {
+        LOG.info("-- Found project [{}] cache [{}], synchronizing data (forced)..", projectKey, lastSync);
+      } else if (shouldUpdate(lastSync)) {
+        LOG.info("-- Found project [{}] cache [{}], synchronizing data..", projectKey, lastSync);
+        failOnError = false;
+      } else {
         LOG.info("Found project [{}] cache [{}]", projectKey, lastSync);
         return;
-      } else {
-        LOG.info("-- Found project [{}] cache [{}], synchronizing data..", projectKey, lastSync);
       }
-      cacheStatus.delete(projectKey);
     } else {
       LOG.info("-- Cache for project [{}] not found, synchronizing data..", projectKey);
     }
 
-    loadData(projectKey);
-    saveStatus(projectKey);
+    try {
+      loadData(projectKey);
+    } catch (Exception e) {
+      if (failOnError) {
+        throw e;
+      }
+
+      LOG.warn("-- Cache update for project [{}] failed, continuing from cache..", projectKey, e);
+      return;
+    }
+
+    saveStatus();
   }
 
-  private void saveStatus(String projectKey) {
-    cacheStatus.save(projectKey);
-    LOG.info("-- Succesfully synchronized project cache");
+  private void saveStatus() {
+    cacheStatus.save();
+    LOG.info("-- Successfully synchronized project cache");
   }
 
   private void loadData(String projectKey) {
     Profiler profiler = Profiler.create(Loggers.get(ProjectCacheSynchronizer.class));
 
-    profiler.startInfo("Load project settings");
-    ProjectSettingsRepo settings = projectSettingsLoader.load(projectKey, null);
+    profiler.startInfo("Load rules");
+    rulesLoader.load(null);
     profiler.stopInfo();
 
-    if (settings.lastAnalysisDate() == null) {
+    profiler.startInfo("Load project settings");
+    ProjectRepositories projectRepo = projectRepositoriesLoader.load(projectKey, true, null);
+
+    if (!projectRepo.exists()) {
+      LOG.debug("Project doesn't exist in the server");
+    } else if (projectRepo.lastAnalysisDate() == null) {
       LOG.debug("No previous analysis found");
-      return;
     }
+    profiler.stopInfo();
 
     profiler.startInfo("Load project quality profiles");
-    Collection<QProfile> qProfiles = qualityProfileLoader.load(projectKey, null);
-    profiler.stopInfo();
-
-    Collection<String> profileKeys = getKeys(qProfiles);
-    
-    profiler.startInfo("Load project active rules");
-    activeRulesLoader.load(profileKeys, projectKey);
-    profiler.stopInfo();
-
-    profiler.startInfo("Load server issues");
-    UserLoginAccumulator consumer = new UserLoginAccumulator();
-    issuesLoader.load(projectKey, consumer);
-    profiler.stopInfo();
-
-    profiler.startInfo("Load user information (" + consumer.loginSet.size() + " users)");
-    for (String login : consumer.loginSet) {
-      userRepository.load(login, null);
+    Collection<QualityProfile> qProfiles;
+    if (projectRepo.exists()) {
+      qProfiles = qualityProfileLoader.load(projectKey, null, null);
+    } else {
+      qProfiles = qualityProfileLoader.loadDefault(null, null);
     }
-    profiler.stopInfo("Load user information");
+    profiler.stopInfo();
+
+    profiler.startInfo("Load project active rules");
+    Collection<String> keys = getKeys(qProfiles);
+    for (String k : keys) {
+      activeRulesLoader.load(k, null);
+    }
+    profiler.stopInfo();
+
+    if (projectRepo.lastAnalysisDate() != null) {
+      profiler.startInfo("Load server issues");
+      UserLoginAccumulator consumer = new UserLoginAccumulator();
+      issuesLoader.load(projectKey, consumer);
+      profiler.stopInfo();
+
+      profiler.startInfo("Load user information");
+      for (String login : consumer.loginSet) {
+        userRepository.load(login, null);
+      }
+      profiler.stopInfo("Load user information");
+    }
   }
 
-  private static Collection<String> getKeys(Collection<QProfile> qProfiles) {
+  private static Collection<String> getKeys(Collection<QualityProfile> qProfiles) {
     List<String> list = new ArrayList<>(qProfiles.size());
-    for (QProfile qp : qProfiles) {
-      list.add(qp.key());
+    for (QualityProfile qp : qProfiles) {
+      list.add(qp.getKey());
     }
 
     return list;

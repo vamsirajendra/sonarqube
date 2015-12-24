@@ -10,7 +10,12 @@ table {
   background-color: #fff;
 }
 
-.odd.selected, .even.selected, .odd.selected a, .even.selected a, .even.selected span, .odd.selected span {
+.odd.selected,
+.even.selected,
+.odd.selected a,
+.even.selected a,
+.even.selected span:not(.rating),
+.odd.selected span:not(.rating) {
   background-color: @lightBlue;
   color: @baseFontColor;
 }
@@ -37,15 +42,15 @@ table.data > tbody > tr > td {
   padding: 5px 5px;
   vertical-align: text-top;
   line-height: 16px;
+
+  &.text-middle {
+    vertical-align: middle;
+  }
 }
 
 table.data td.small, table.data th.small {
   padding: 0;
   white-space: nowrap;
-}
-
-table.data th img, table.data td img {
-  vertical-align: sub;
 }
 
 table.data.zebra > tbody > tr:nth-child(odd) {

@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import org.sonar.api.issue.Issue;
 import org.sonar.api.rule.RuleKey;
-import org.sonar.api.utils.KeyValueFormat;
 import org.sonar.api.utils.log.Loggers;
 import org.sonar.batch.protocol.output.BatchReport;
 import org.sonar.core.issue.DefaultIssue;
@@ -36,7 +35,7 @@ import org.sonar.db.protobuf.DbCommons;
 import org.sonar.db.protobuf.DbIssues;
 import org.sonar.server.computation.batch.BatchReportReader;
 import org.sonar.server.computation.component.Component;
-import org.sonar.server.computation.component.ReportTreeRootHolder;
+import org.sonar.server.computation.component.TreeRootHolder;
 import org.sonar.server.computation.issue.commonrule.CommonRuleEngine;
 import org.sonar.server.computation.source.SourceLinesRepository;
 import org.sonar.server.rule.CommonRuleKeys;
@@ -45,12 +44,12 @@ import static com.google.common.collect.Lists.newArrayList;
 
 public class TrackerRawInputFactory {
 
-  private final ReportTreeRootHolder treeRootHolder;
+  private final TreeRootHolder treeRootHolder;
   private final BatchReportReader reportReader;
   private final SourceLinesRepository sourceLinesRepository;
   private final CommonRuleEngine commonRuleEngine;
 
-  public TrackerRawInputFactory(ReportTreeRootHolder treeRootHolder, BatchReportReader reportReader,
+  public TrackerRawInputFactory(TreeRootHolder treeRootHolder, BatchReportReader reportReader,
     SourceLinesRepository sourceLinesRepository, CommonRuleEngine commonRuleEngine) {
     this.treeRootHolder = treeRootHolder;
     this.reportReader = reportReader;
@@ -71,7 +70,7 @@ public class TrackerRawInputFactory {
 
     @Override
     protected LineHashSequence loadLineHashSequence() {
-      Iterable<String> lines;
+      List<String> lines;
       if (component.getType() == Component.Type.FILE) {
         lines = newArrayList(sourceLinesRepository.readLines(component));
       } else {
@@ -129,9 +128,6 @@ public class TrackerRawInputFactory {
       if (reportIssue.hasEffortToFix()) {
         issue.setEffortToFix(reportIssue.getEffortToFix());
       }
-      if (reportIssue.hasAttributes()) {
-        issue.setAttributes(KeyValueFormat.parse(reportIssue.getAttributes()));
-      }
       DbIssues.Locations.Builder dbLocationsBuilder = DbIssues.Locations.newBuilder();
       if (reportIssue.hasTextRange()) {
         dbLocationsBuilder.setTextRange(convertTextRange(reportIssue.getTextRange()));
@@ -176,7 +172,7 @@ public class TrackerRawInputFactory {
     }
   }
 
-  private DbCommons.TextRange.Builder convertTextRange(BatchReport.TextRange sourceRange) {
+  private static DbCommons.TextRange.Builder convertTextRange(BatchReport.TextRange sourceRange) {
     DbCommons.TextRange.Builder targetRange = DbCommons.TextRange.newBuilder();
     if (sourceRange.hasStartLine()) {
       targetRange.setStartLine(sourceRange.getStartLine());

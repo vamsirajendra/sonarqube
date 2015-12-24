@@ -49,6 +49,7 @@ public class ServerWs implements WebService {
         "</ul>")
       .setSince("2.10")
       .setHandler(RailsHandler.INSTANCE)
+      .setInternal(true)
       .setResponseExample(Resources.getResource(this.getClass(), "example-index.json"));
 
     RailsHandler.addFormatParam(action);
@@ -59,6 +60,7 @@ public class ServerWs implements WebService {
       .setDescription("Upgrade the SonarQube database")
       .setSince("2.10")
       .setPost(true)
+      .setInternal(true)
       .setHandler(RailsHandler.INSTANCE)
       .setResponseExample(Resources.getResource(this.getClass(), "example-setup.json"));
 

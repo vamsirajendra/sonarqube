@@ -3,11 +3,12 @@ import _ from 'underscore';
 import Backbone from 'backbone';
 import Marionette from 'backbone.marionette';
 import ProfileActivationView from './profile-activation-view';
-import '../templates';
+import Template from '../templates/rule/coding-rules-rule-profile.hbs';
+import confirmDialog from '../confirm-dialog';
 
 export default Marionette.ItemView.extend({
   tagName: 'tr',
-  template: Templates['coding-rules-rule-profile'],
+  template: Template,
 
   modelEvents: {
     'change': 'render'
@@ -48,9 +49,9 @@ export default Marionette.ItemView.extend({
   revert: function () {
     var that = this,
         ruleKey = this.options.rule.get('key');
-    window.confirmDialog({
-      title: t('coding_rules.revert_to_parent_definition'),
-      html: tp('coding_rules.revert_to_parent_definition.confirm', this.getParent().name),
+    confirmDialog({
+      title: window.t('coding_rules.revert_to_parent_definition'),
+      html: window.tp('coding_rules.revert_to_parent_definition.confirm', this.getParent().name),
       yesHandler: function () {
         return $.ajax({
           type: 'POST',
@@ -70,9 +71,9 @@ export default Marionette.ItemView.extend({
   deactivate: function () {
     var that = this,
         ruleKey = this.options.rule.get('key');
-    window.confirmDialog({
-      title: t('coding_rules.deactivate'),
-      html: tp('coding_rules.deactivate.confirm'),
+    confirmDialog({
+      title: window.t('coding_rules.deactivate'),
+      html: window.tp('coding_rules.deactivate.confirm'),
       yesHandler: function () {
         return $.ajax({
           type: 'POST',
@@ -136,5 +137,3 @@ export default Marionette.ItemView.extend({
     });
   }
 });
-
-

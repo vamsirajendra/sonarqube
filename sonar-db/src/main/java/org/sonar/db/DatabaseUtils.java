@@ -33,21 +33,21 @@ import java.util.Date;
 import java.util.List;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
-import org.slf4j.LoggerFactory;
 import org.sonar.api.utils.log.Logger;
+import org.sonar.api.utils.log.Loggers;
 
 import static com.google.common.collect.Lists.newArrayList;
 
 public class DatabaseUtils {
 
-  private static final int PARTITION_SIZE_FOR_ORACLE = 1000;
+  public static final int PARTITION_SIZE_FOR_ORACLE = 1000;
 
   public static void closeQuietly(@Nullable Connection connection) {
     if (connection != null) {
       try {
         connection.close();
       } catch (SQLException e) {
-        LoggerFactory.getLogger(DatabaseUtils.class).warn("Fail to close connection", e);
+        Loggers.get(DatabaseUtils.class).warn("Fail to close connection", e);
         // ignore
       }
     }
@@ -58,7 +58,7 @@ public class DatabaseUtils {
       try {
         stmt.close();
       } catch (SQLException e) {
-        LoggerFactory.getLogger(DatabaseUtils.class).warn("Fail to close statement", e);
+        Loggers.get(DatabaseUtils.class).warn("Fail to close statement", e);
         // ignore
       }
     }
@@ -69,10 +69,46 @@ public class DatabaseUtils {
       try {
         rs.close();
       } catch (SQLException e) {
-        LoggerFactory.getLogger(DatabaseUtils.class).warn("Fail to close result set", e);
+        Loggers.get(DatabaseUtils.class).warn("Fail to close result set", e);
         // ignore
       }
     }
+  }
+
+  /**
+   * Returns an escaped value in parameter, with the desired wildcards. Suitable to be used in a like sql query<br />
+   * Escapes the "/", "%" and "_" characters.<br/>
+   * 
+   * You <strong>must</strong> add "ESCAPE '/'" after your like query. It defines '/' as the escape character.
+   */
+  public static String buildLikeValue(String value, WildcardPosition wildcardPosition) {
+    String escapedValue = escapePercentAndUnderscore(value);
+    String wildcard = "%";
+    switch (wildcardPosition) {
+      case BEFORE:
+        escapedValue = wildcard + escapedValue;
+        break;
+      case AFTER:
+        escapedValue += wildcard;
+        break;
+      case BEFORE_AND_AFTER:
+        escapedValue = wildcard + escapedValue + wildcard;
+        break;
+      default:
+        throw new UnsupportedOperationException("Unhandled WildcardPosition: " + wildcardPosition);
+    }
+
+    return escapedValue;
+  }
+
+  /**
+   * Replace escape percent and underscore by adding a slash just before
+   */
+  private static String escapePercentAndUnderscore(String value) {
+    return value
+      .replaceAll("/", "//")
+      .replaceAll("%", "/%")
+      .replaceAll("_", "/_");
   }
 
   /**

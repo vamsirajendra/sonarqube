@@ -21,6 +21,7 @@
 package org.sonar.db.ce;
 
 import com.google.common.base.Optional;
+import java.util.Collections;
 import java.util.List;
 import org.apache.ibatis.session.RowBounds;
 import org.junit.Rule;
@@ -58,8 +59,10 @@ public class CeActivityDaoTest {
     assertThat(saved.get().getSubmittedAt()).isEqualTo(1_300_000_000_000L);
     assertThat(saved.get().getCreatedAt()).isEqualTo(1_450_000_000_000L);
     assertThat(saved.get().getStartedAt()).isEqualTo(1_500_000_000_000L);
-    assertThat(saved.get().getFinishedAt()).isEqualTo(1_500_000_000_500L);
+    assertThat(saved.get().getExecutedAt()).isEqualTo(1_500_000_000_500L);
     assertThat(saved.get().getExecutionTimeMs()).isEqualTo(500L);
+    assertThat(saved.get().getSnapshotId()).isEqualTo(123_456);
+    assertThat(saved.get().toString()).isNotEmpty();
   }
 
   @Test
@@ -72,11 +75,18 @@ public class CeActivityDaoTest {
     insert("TASK_2", REPORT, "PROJECT_2", CeActivityDto.Status.SUCCESS);
     assertThat(underTest.selectByUuid(db.getSession(), "TASK_2").get().getIsLast()).isTrue();
 
-    // two tasks on PROJECT_1, the more recent one is TASK_3
+    // two tasks on PROJECT_1, the most recent one is TASK_3
     insert("TASK_3", REPORT, "PROJECT_1", CeActivityDto.Status.FAILED);
     assertThat(underTest.selectByUuid(db.getSession(), "TASK_1").get().getIsLast()).isFalse();
     assertThat(underTest.selectByUuid(db.getSession(), "TASK_2").get().getIsLast()).isTrue();
     assertThat(underTest.selectByUuid(db.getSession(), "TASK_3").get().getIsLast()).isTrue();
+
+    // inserting a cancelled task does not change the last task
+    insert("TASK_4", REPORT, "PROJECT_1", CeActivityDto.Status.CANCELED);
+    assertThat(underTest.selectByUuid(db.getSession(), "TASK_1").get().getIsLast()).isFalse();
+    assertThat(underTest.selectByUuid(db.getSession(), "TASK_2").get().getIsLast()).isTrue();
+    assertThat(underTest.selectByUuid(db.getSession(), "TASK_3").get().getIsLast()).isTrue();
+    assertThat(underTest.selectByUuid(db.getSession(), "TASK_4").get().getIsLast()).isFalse();
   }
 
   @Test
@@ -146,6 +156,24 @@ public class CeActivityDaoTest {
   }
 
   @Test
+  public void selectByQuery_no_results_if_shortcircuited_by_component_uuids() {
+    insert("TASK_1", REPORT, "PROJECT_1", CeActivityDto.Status.SUCCESS);
+
+    CeActivityQuery query = new CeActivityQuery();
+    query.setComponentUuids(Collections.<String>emptyList());
+    assertThat(underTest.selectByQuery(db.getSession(), query, new RowBounds(0, 10))).isEmpty();
+  }
+
+  @Test
+  public void countByQuery_no_results_if_shortcircuited_by_component_uuids() {
+    insert("TASK_1", REPORT, "PROJECT_1", CeActivityDto.Status.SUCCESS);
+
+    CeActivityQuery query = new CeActivityQuery();
+    query.setComponentUuids(Collections.<String>emptyList());
+    assertThat(underTest.countByQuery(db.getSession(), query)).isEqualTo(0);
+  }
+
+  @Test
   public void select_and_count_by_date() {
     insertWithDates("UUID1", 1_450_000_000_000L, 1_470_000_000_000L);
     insertWithDates("UUID2", 1_460_000_000_000L, 1_480_000_000_000L);
@@ -155,28 +183,28 @@ public class CeActivityDaoTest {
     assertThat(underTest.selectByQuery(db.getSession(), query, new RowBounds(0, 10))).extracting("uuid").containsOnly("UUID2");
     assertThat(underTest.countByQuery(db.getSession(), query)).isEqualTo(1);
 
-    // search by max finished date
-    query = new CeActivityQuery().setMaxFinishedAt(1_475_000_000_000L);
+    // search by max executed date
+    query = new CeActivityQuery().setMaxExecutedAt(1_475_000_000_000L);
     assertThat(underTest.selectByQuery(db.getSession(), query, new RowBounds(0, 10))).extracting("uuid").containsOnly("UUID1");
     assertThat(underTest.countByQuery(db.getSession(), query)).isEqualTo(1);
 
     // search by both dates
     query = new CeActivityQuery()
       .setMinSubmittedAt(1_400_000_000_000L)
-      .setMaxFinishedAt(1_475_000_000_000L);
+      .setMaxExecutedAt(1_475_000_000_000L);
     assertThat(underTest.selectByQuery(db.getSession(), query, new RowBounds(0, 10))).extracting("uuid").containsOnly("UUID1");
     assertThat(underTest.countByQuery(db.getSession(), query)).isEqualTo(1);
 
   }
 
-  private void insertWithDates(String uuid, long submittedAt, long finishedAt) {
+  private void insertWithDates(String uuid, long submittedAt, long executedAt) {
     CeQueueDto queueDto = new CeQueueDto();
     queueDto.setUuid(uuid);
     queueDto.setTaskType("fake");
     CeActivityDto dto = new CeActivityDto(queueDto);
     dto.setStatus(CeActivityDto.Status.SUCCESS);
     dto.setSubmittedAt(submittedAt);
-    dto.setFinishedAt(finishedAt);
+    dto.setExecutedAt(executedAt);
     underTest.insert(db.getSession(), dto);
   }
 
@@ -221,8 +249,9 @@ public class CeActivityDaoTest {
     CeActivityDto dto = new CeActivityDto(queueDto);
     dto.setStatus(status);
     dto.setStartedAt(1_500_000_000_000L);
-    dto.setFinishedAt(1_500_000_000_500L);
+    dto.setExecutedAt(1_500_000_000_500L);
     dto.setExecutionTimeMs(500L);
+    dto.setSnapshotId(123_456L);
     underTest.insert(db.getSession(), dto);
   }
 

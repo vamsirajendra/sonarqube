@@ -190,7 +190,7 @@ public final class CoreMetrics {
     .setDescription("Public API")
     .setDirection(Metric.DIRECTION_WORST)
     .setQualitative(false)
-    .setDomain(DOMAIN_SIZE)
+    .setDomain(DOMAIN_DOCUMENTATION)
     .create();
 
   /**
@@ -2245,6 +2245,8 @@ public final class CoreMetrics {
    */
   public static final Metric LAST_COMMIT_DATE = new Metric.Builder(LAST_COMMIT_DATE_KEY, "Date of last commit", Metric.ValueType.MILLISEC)
     .setDomain(CoreMetrics.DOMAIN_SCM)
+    // waiting for type "datetime" to be correctly handled
+    .setHidden(true)
     .create();
 
   private static final List<Metric> METRICS;

@@ -21,7 +21,6 @@ package org.sonar.batch.protocol.output;
 
 import com.google.common.collect.Iterators;
 import java.io.File;
-import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Rule;
@@ -31,6 +30,7 @@ import org.sonar.batch.protocol.Constants;
 import org.sonar.core.util.CloseableIterator;
 import org.sonar.core.util.Protobuf;
 
+import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class BatchReportWriterTest {
@@ -105,7 +105,7 @@ public class BatchReportWriterTest {
       .setMsg("the message")
       .build();
 
-    underTest.writeComponentIssues(1, Arrays.asList(issue));
+    underTest.writeComponentIssues(1, asList(issue));
 
     assertThat(underTest.hasComponentData(FileStructure.Domain.ISSUES, 1)).isTrue();
     File file = underTest.getFileStructure().fileFor(FileStructure.Domain.ISSUES, 1);
@@ -125,7 +125,7 @@ public class BatchReportWriterTest {
       .setValueType(Constants.MeasureValueType.DOUBLE)
       .build();
 
-    underTest.writeComponentMeasures(1, Arrays.asList(measure));
+    underTest.writeComponentMeasures(1, asList(measure));
 
     assertThat(underTest.hasComponentData(FileStructure.Domain.MEASURES, 1)).isTrue();
     File file = underTest.getFileStructure().fileFor(FileStructure.Domain.MEASURES, 1);
@@ -170,7 +170,6 @@ public class BatchReportWriterTest {
         .setEndLine(5)
         .build())
       .addDuplicate(BatchReport.Duplicate.newBuilder()
-        .setOtherFileKey("COMPONENT_A")
         .setOtherFileRef(2)
         .setRange(BatchReport.TextRange.newBuilder()
           .setStartLine(6)
@@ -178,7 +177,7 @@ public class BatchReportWriterTest {
           .build())
         .build())
       .build();
-    underTest.writeComponentDuplications(1, Arrays.asList(duplication));
+    underTest.writeComponentDuplications(1, asList(duplication));
 
     assertThat(underTest.hasComponentData(FileStructure.Domain.DUPLICATIONS, 1)).isTrue();
     File file = underTest.getFileStructure().fileFor(FileStructure.Domain.DUPLICATIONS, 1);
@@ -187,6 +186,32 @@ public class BatchReportWriterTest {
       BatchReport.Duplication dup = duplications.next();
       assertThat(dup.getOriginPosition()).isNotNull();
       assertThat(dup.getDuplicateList()).hasSize(1);
+    }
+  }
+
+  @Test
+  public void write_duplication_blocks() {
+    assertThat(underTest.hasComponentData(FileStructure.Domain.CPD_TEXT_BLOCKS, 1)).isFalse();
+
+    BatchReport.CpdTextBlock duplicationBlock = BatchReport.CpdTextBlock.newBuilder()
+      .setHash("abcdefghijklmnop")
+      .setStartLine(1)
+      .setEndLine(2)
+      .setStartTokenIndex(10)
+      .setEndTokenIndex(15)
+      .build();
+    underTest.writeCpdTextBlocks(1, asList(duplicationBlock));
+
+    assertThat(underTest.hasComponentData(FileStructure.Domain.CPD_TEXT_BLOCKS, 1)).isTrue();
+    File file = underTest.getFileStructure().fileFor(FileStructure.Domain.CPD_TEXT_BLOCKS, 1);
+    assertThat(file).exists().isFile();
+    try (CloseableIterator<BatchReport.CpdTextBlock> duplicationBlocks = Protobuf.readStream(file, BatchReport.CpdTextBlock.parser())) {
+      BatchReport.CpdTextBlock duplicationBlockResult = duplicationBlocks.next();
+      assertThat(duplicationBlockResult.getHash()).isEqualTo("abcdefghijklmnop");
+      assertThat(duplicationBlockResult.getStartLine()).isEqualTo(1);
+      assertThat(duplicationBlockResult.getEndLine()).isEqualTo(2);
+      assertThat(duplicationBlockResult.getStartTokenIndex()).isEqualTo(10);
+      assertThat(duplicationBlockResult.getEndTokenIndex()).isEqualTo(15);
     }
   }
 
@@ -211,7 +236,7 @@ public class BatchReportWriterTest {
         .build())
       .build();
 
-    underTest.writeComponentSymbols(1, Arrays.asList(symbol));
+    underTest.writeComponentSymbols(1, asList(symbol));
 
     assertThat(underTest.hasComponentData(FileStructure.Domain.SYMBOLS, 1)).isTrue();
 
@@ -227,7 +252,7 @@ public class BatchReportWriterTest {
     // no data yet
     assertThat(underTest.hasComponentData(FileStructure.Domain.SYNTAX_HIGHLIGHTINGS, 1)).isFalse();
 
-    underTest.writeComponentSyntaxHighlighting(1, Arrays.asList(
+    underTest.writeComponentSyntaxHighlighting(1, asList(
       BatchReport.SyntaxHighlighting.newBuilder()
         .setRange(BatchReport.TextRange.newBuilder()
           .setStartLine(1)
@@ -244,7 +269,7 @@ public class BatchReportWriterTest {
     // no data yet
     assertThat(underTest.hasComponentData(FileStructure.Domain.COVERAGES, 1)).isFalse();
 
-    underTest.writeComponentCoverage(1, Arrays.asList(
+    underTest.writeComponentCoverage(1, asList(
       BatchReport.Coverage.newBuilder()
         .setLine(1)
         .setConditions(1)
@@ -262,7 +287,7 @@ public class BatchReportWriterTest {
   public void write_tests() {
     assertThat(underTest.hasComponentData(FileStructure.Domain.TESTS, 1)).isFalse();
 
-    underTest.writeTests(1, Arrays.asList(
+    underTest.writeTests(1, asList(
       BatchReport.Test.getDefaultInstance()));
 
     assertThat(underTest.hasComponentData(FileStructure.Domain.TESTS, 1)).isTrue();
@@ -273,7 +298,7 @@ public class BatchReportWriterTest {
   public void write_coverage_details() {
     assertThat(underTest.hasComponentData(FileStructure.Domain.COVERAGE_DETAILS, 1)).isFalse();
 
-    underTest.writeCoverageDetails(1, Arrays.asList(
+    underTest.writeCoverageDetails(1, asList(
       BatchReport.CoverageDetail.getDefaultInstance()));
 
     assertThat(underTest.hasComponentData(FileStructure.Domain.COVERAGE_DETAILS, 1)).isTrue();

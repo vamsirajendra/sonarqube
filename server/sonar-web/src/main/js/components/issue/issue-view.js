@@ -10,13 +10,14 @@ import AssignFormView from './views/assign-form-view';
 import CommentFormView from './views/comment-form-view';
 import PlanFormView from './views/plan-form-view';
 import SetSeverityFormView from './views/set-severity-form-view';
+import MoreActionsView from './views/more-actions-view';
 import TagsFormView from './views/tags-form-view';
-import Workspace from 'components/workspace/main';
-import './templates';
+import Workspace from '../workspace/main';
+import Template from './templates/issue.hbs';
 
 export default Marionette.ItemView.extend({
   className: 'issue',
-  template: Templates.issue,
+  template: Template,
 
   modelEvents: {
     'change': 'render',
@@ -34,6 +35,7 @@ export default Marionette.ItemView.extend({
       'click .js-issue-assign-to-me': 'assignToMe',
       'click .js-issue-plan': 'plan',
       'click .js-issue-show-changelog': 'showChangeLog',
+      'click .js-issue-more': 'showMoreActions',
       'click .js-issue-rule': 'showRule',
       'click .js-issue-edit-tags': 'editTags',
       'click .js-issue-locations': 'showLocations'
@@ -204,8 +206,31 @@ export default Marionette.ItemView.extend({
 
   showRule: function () {
     var ruleKey = this.model.get('rule');
-    var RealWorkspace = Workspace.openComponent ? Workspace : require('components/workspace/main');
-    RealWorkspace.openRule({ key: ruleKey });
+    Workspace.openRule({ key: ruleKey });
+  },
+
+  showMoreActions: function (e) {
+    e.stopPropagation();
+    $('body').click();
+    this.popup = new MoreActionsView({
+      triggerEl: $(e.currentTarget),
+      bottomRight: true,
+      model: this.model,
+      detailView: this
+    });
+    this.popup.render();
+  },
+
+  action: function (action) {
+    var that = this;
+    this.disableControls();
+    return this.model.customAction(action)
+        .done(function () {
+          that.updateAfterAction(true);
+        })
+        .fail(function () {
+          that.enableControls();
+        });
   },
 
   editTags: function (e) {

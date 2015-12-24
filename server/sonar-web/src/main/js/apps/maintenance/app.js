@@ -5,7 +5,9 @@ import MainView from './main-view';
 
 var App = new Marionette.Application();
 
-App.on('start', function (options) {
+App.on('start', function () {
+  let options = window.sonarqube;
+
   var viewOptions = _.extend(options, {
     model: new Backbone.Model()
   });
@@ -13,6 +15,6 @@ App.on('start', function (options) {
   mainView.render().refresh();
 });
 
-export default App;
+App.start();
 
 

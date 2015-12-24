@@ -100,6 +100,11 @@ public class BatchReportReaderImpl implements BatchReportReader {
   }
 
   @Override
+  public CloseableIterator<BatchReport.CpdTextBlock> readCpdTextBlocks(int componentRef) {
+    return delegate.readCpdTextBlocks(componentRef);
+  }
+
+  @Override
   public CloseableIterator<BatchReport.Symbol> readComponentSymbols(int componentRef) {
     return delegate.readComponentSymbols(componentRef);
   }
@@ -165,7 +170,7 @@ public class BatchReportReaderImpl implements BatchReportReader {
     }
 
     try {
-      return new ParserCloseableIterator<>(BatchReport.Test.PARSER, FileUtils.openInputStream(file));
+      return new ParserCloseableIterator<>(BatchReport.Test.parser(), FileUtils.openInputStream(file));
     } catch (IOException e) {
       Throwables.propagate(e);
       // actually never reached
@@ -181,7 +186,7 @@ public class BatchReportReaderImpl implements BatchReportReader {
     }
 
     try {
-      return new ParserCloseableIterator<>(BatchReport.CoverageDetail.PARSER, FileUtils.openInputStream(file));
+      return new ParserCloseableIterator<>(BatchReport.CoverageDetail.parser(), FileUtils.openInputStream(file));
     } catch (IOException e) {
       Throwables.propagate(e);
       // actually never reached

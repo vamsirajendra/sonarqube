@@ -111,6 +111,11 @@ class LogbackLogger extends BaseLogger {
   }
 
   @Override
+  void doWarn(String msg, Throwable thrown) {
+    logback.warn(msg, thrown);
+  }
+
+  @Override
   protected void doWarn(String msg, @Nullable Object arg) {
     logback.warn(msg, arg);
   }
@@ -166,6 +171,11 @@ class LogbackLogger extends BaseLogger {
         throw new IllegalArgumentException("Only TRACE, DEBUG and INFO logging levels are supported. Got: " + level);
     }
     return true;
+  }
+
+  @Override
+  public LoggerLevel getLevel() {
+    return LoggerLevel.valueOf(logback.getEffectiveLevel().levelStr);
   }
 
   Logger logbackLogger() {

@@ -35,6 +35,7 @@ public class CeActivityDto {
 
   private String uuid;
   private String componentUuid;
+  private Long snapshotId;
   private Status status;
   private String taskType;
   private boolean isLast;
@@ -42,7 +43,7 @@ public class CeActivityDto {
   private String submitterLogin;
   private long submittedAt;
   private Long startedAt;
-  private Long finishedAt;
+  private Long executedAt;
   private long createdAt;
   private long updatedAt;
   private Long executionTimeMs;
@@ -65,17 +66,19 @@ public class CeActivityDto {
     return uuid;
   }
 
-  public void setUuid(String s) {
+  public CeActivityDto setUuid(String s) {
     checkArgument(s.length() <= 40, "Value is too long for column CE_ACTIVITY.UUID: %s", s);
     this.uuid = s;
+    return this;
   }
 
   public String getTaskType() {
     return taskType;
   }
 
-  public void setTaskType(String s) {
+  public CeActivityDto setTaskType(String s) {
     this.taskType = s;
+    return this;
   }
 
   @CheckForNull
@@ -83,25 +86,28 @@ public class CeActivityDto {
     return componentUuid;
   }
 
-  public void setComponentUuid(@Nullable String s) {
+  public CeActivityDto setComponentUuid(@Nullable String s) {
     checkArgument(s == null || s.length() <= 40, "Value is too long for column CE_ACTIVITY.COMPONENT_UUID: %s", s);
     this.componentUuid = s;
+    return this;
   }
 
   public Status getStatus() {
     return status;
   }
 
-  public void setStatus(Status s) {
+  public CeActivityDto setStatus(Status s) {
     this.status = s;
+    return this;
   }
 
   public boolean getIsLast() {
     return isLast;
   }
 
-  void setIsLast(boolean b) {
+  CeActivityDto setIsLast(boolean b) {
     this.isLast = b;
+    return this;
   }
 
   public String getIsLastKey() {
@@ -117,8 +123,9 @@ public class CeActivityDto {
     return submittedAt;
   }
 
-  public void setSubmittedAt(long submittedAt) {
+  public CeActivityDto setSubmittedAt(long submittedAt) {
     this.submittedAt = submittedAt;
+    return this;
   }
 
   @CheckForNull
@@ -126,33 +133,37 @@ public class CeActivityDto {
     return startedAt;
   }
 
-  public void setStartedAt(@Nullable Long l) {
+  public CeActivityDto setStartedAt(@Nullable Long l) {
     this.startedAt = l;
+    return this;
   }
 
   @CheckForNull
-  public Long getFinishedAt() {
-    return finishedAt;
+  public Long getExecutedAt() {
+    return executedAt;
   }
 
-  public void setFinishedAt(@Nullable Long l) {
-    this.finishedAt = l;
+  public CeActivityDto setExecutedAt(@Nullable Long l) {
+    this.executedAt = l;
+    return this;
   }
 
   public long getCreatedAt() {
     return createdAt;
   }
 
-  public void setCreatedAt(long l) {
+  public CeActivityDto setCreatedAt(long l) {
     this.createdAt = l;
+    return this;
   }
 
   public long getUpdatedAt() {
     return updatedAt;
   }
 
-  public void setUpdatedAt(long l) {
+  public CeActivityDto setUpdatedAt(long l) {
     this.updatedAt = l;
+    return this;
   }
 
   @CheckForNull
@@ -160,9 +171,20 @@ public class CeActivityDto {
     return executionTimeMs;
   }
 
-  public void setExecutionTimeMs(@Nullable Long l) {
+  public CeActivityDto setExecutionTimeMs(@Nullable Long l) {
     checkArgument(l == null || l >= 0, "Execution time must be positive: %s", l);
     this.executionTimeMs = l;
+    return this;
+  }
+
+  @CheckForNull
+  public Long getSnapshotId() {
+    return snapshotId;
+  }
+
+  public CeActivityDto setSnapshotId(@Nullable Long snapshotId) {
+    this.snapshotId = snapshotId;
+    return this;
   }
 
   @Override
@@ -177,7 +199,7 @@ public class CeActivityDto {
       .add("submitterLogin", submitterLogin)
       .add("submittedAt", submittedAt)
       .add("startedAt", startedAt)
-      .add("finishedAt", finishedAt)
+      .add("executedAt", executedAt)
       .add("createdAt", createdAt)
       .add("updatedAt", updatedAt)
       .add("executionTimeMs", executionTimeMs)

@@ -1,12 +1,10 @@
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/api-documentation-header.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['api-documentation-header'],
+  template: Template,
 
   modelEvents: {
     'change': 'render'
   }
 });
-
-

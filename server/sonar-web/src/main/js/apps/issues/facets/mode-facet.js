@@ -1,9 +1,9 @@
 import _ from 'underscore';
 import BaseFacet from './base-facet';
-import '../templates';
+import Template from '../templates/facets/issues-mode-facet.hbs';
 
 export default BaseFacet.extend({
-  template: Templates['issues-mode-facet'],
+  template: Template,
 
   events: {
     'change [name="issues-page-mode"]': 'onModeChange'
@@ -15,7 +15,9 @@ export default BaseFacet.extend({
   },
 
   serializeData: function () {
-    return _.extend(this._super(), { mode: this.options.app.state.getFacetMode() });
+    return _.extend(BaseFacet.prototype.serializeData.apply(this, arguments), {
+      mode: this.options.app.state.getFacetMode()
+    });
   }
 });
 

@@ -19,9 +19,8 @@
  */
 package org.sonar.api.utils.log;
 
-import javax.annotation.Nullable;
-
 import java.io.PrintStream;
+import javax.annotation.Nullable;
 
 import static org.sonar.api.utils.log.ConsoleFormatter.format;
 
@@ -136,6 +135,12 @@ class ConsoleLogger extends BaseLogger {
   }
 
   @Override
+  void doWarn(String msg, Throwable thrown) {
+    doWarn(msg);
+    thrown.printStackTrace();
+  }
+
+  @Override
   protected void doWarn(String pattern, @Nullable Object arg) {
     warn(format(pattern, arg));
   }
@@ -179,6 +184,11 @@ class ConsoleLogger extends BaseLogger {
   @Override
   public boolean setLevel(LoggerLevel level) {
     return false;
+  }
+
+  @Override
+  public LoggerLevel getLevel() {
+    return Loggers.getFactory().getLevel();
   }
 
   private void log(String level, String msg) {

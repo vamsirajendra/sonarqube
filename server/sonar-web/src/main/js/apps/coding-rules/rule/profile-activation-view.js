@@ -1,14 +1,15 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import Backbone from 'backbone';
-import ModalForm from 'components/common/modal-form';
-import '../templates';
+import ModalForm from '../../../components/common/modal-form';
+import Template from '../templates/rule/coding-rules-profile-activation.hbs';
+import { csvEscape } from '../../../helpers/csv';
 
 export default ModalForm.extend({
-  template: Templates['coding-rules-profile-activation'],
+  template: Template,
 
   ui: function () {
-    return _.extend(this._super(), {
+    return _.extend(ModalForm.prototype.ui.apply(this, arguments), {
       qualityProfileSelect: '#coding-rules-quality-profile-activation-select',
       qualityProfileSeverity: '#coding-rules-quality-profile-activation-severity',
       qualityProfileActivate: '#coding-rules-quality-profile-activation-activate',
@@ -17,13 +18,13 @@ export default ModalForm.extend({
   },
 
   events: function () {
-    return _.extend(this._super(), {
+    return _.extend(ModalForm.prototype.events.apply(this, arguments), {
       'click @ui.qualityProfileActivate': 'activate'
     });
   },
 
   onRender: function () {
-    this._super();
+    ModalForm.prototype.onRender.apply(this, arguments);
 
     this.ui.qualityProfileSelect.select2({
       width: '250px',
@@ -62,7 +63,7 @@ export default ModalForm.extend({
           };
         }).get(),
         paramsHash = (params.map(function (param) {
-          return param.key + '=' + window.csvEscape(param.value);
+          return param.key + '=' + csvEscape(param.value);
         })).join(';');
 
     if (this.model) {
@@ -127,7 +128,7 @@ export default ModalForm.extend({
     var availableProfiles = this.getAvailableQualityProfiles(this.options.rule.get('lang')),
         contextProfile = this.options.app.state.get('query').qprofile;
 
-    return _.extend(this._super(), {
+    return _.extend(ModalForm.prototype.serializeData.apply(this, arguments), {
       change: this.model && this.model.has('severity'),
       params: params,
       qualityProfiles: availableProfiles,
@@ -138,5 +139,3 @@ export default ModalForm.extend({
     });
   }
 });
-
-

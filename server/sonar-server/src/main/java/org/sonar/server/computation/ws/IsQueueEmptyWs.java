@@ -44,7 +44,7 @@ public class IsQueueEmptyWs implements WebService {
   public void define(Context context) {
     NewController controller = context
       .createController(API_ENDPOINT)
-      .setDescription("Analysis reports processed");
+      .setDescription("For internal testing - do not use");
     action.define(controller);
     controller.done();
   }
@@ -60,6 +60,8 @@ public class IsQueueEmptyWs implements WebService {
       controller
         .createAction("is_queue_empty")
         .setDescription("Check if the queue of Compute Engine is empty")
+        .setResponseExample(getClass().getResource("is_queue_empty-example.txt"))
+        .setSince("5.1")
         .setInternal(true)
         .setHandler(this);
     }

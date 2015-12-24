@@ -1,17 +1,29 @@
+import moment from 'moment';
 import React from 'react';
-import {getProjectUrl} from '../../helpers/Url';
+
+import { getComponentUrl } from '../../helpers/urls';
 import QualifierIcon from '../../components/shared/qualifier-icon';
 import PendingIcon from '../../components/shared/pending-icon';
-import {STATUSES} from './constants';
+import { STATUSES } from './constants';
+import { formatDuration } from './helpers';
+import { TooltipsMixin } from '../../components/mixins/tooltips-mixin';
+
 
 export default React.createClass({
   propTypes: {
     tasks: React.PropTypes.arrayOf(React.PropTypes.object).isRequired
   },
 
+  mixins: [TooltipsMixin],
+
   onTaskCanceled (task, e) {
     e.preventDefault();
     this.props.onTaskCanceled(task);
+  },
+
+  handleFilter (task, e) {
+    e.preventDefault();
+    this.props.onFilter(task);
   },
 
   renderTaskStatus(task) {
@@ -24,18 +36,19 @@ export default React.createClass({
         inner = <i className="spinner"/>;
         break;
       case STATUSES.SUCCESS:
-        inner = <i className="icon-test-status-ok"/>;
+        inner = <span className="badge badge-success">{window.t('background_task.status.SUCCESS')}</span>;
         break;
       case STATUSES.FAILED:
-        inner = <i className="icon-test-status-error"/>;
+        inner = <span className="badge badge-danger">{window.t('background_task.status.FAILED')}</span>;
         break;
       case STATUSES.CANCELED:
-        inner = <i className="icon-test-status-skipped"/>;
+        inner = <span className="badge badge-muted">{window.t('background_task.status.CANCELED')}</span>;
         break;
       default:
         inner = '';
     }
-    return <td className="thin spacer-right">{inner}</td>;
+    return <td className="thin spacer-right" title={window.t('background_task.status', task.status)}
+               data-toggle="tooltip">{inner}</td>;
   },
 
   renderTaskComponent(task) {
@@ -43,13 +56,12 @@ export default React.createClass({
       return <td><span className="note">{task.id}</span></td>;
     }
 
-    let qualifier = task.type === 'REPORT' ? 'TRK' : null;
     return (
         <td>
           <span className="little-spacer-right">
-            <QualifierIcon qualifier={qualifier}/>
+            <QualifierIcon qualifier={task.componentQualifier}/>
           </span>
-          <a href={getProjectUrl(task.componentKey)}>{task.componentName}</a>
+          <a href={getComponentUrl(task.componentKey)}>{task.componentName}</a>
         </td>
     );
   },
@@ -73,19 +85,28 @@ export default React.createClass({
   },
 
   renderTaskExecutionTime(task) {
-    let inner = task.executionTimeMs ? `${task.executionTimeMs} ms` : '';
-    return <td className="thin nowrap text-right">{inner}</td>;
+    return <td className="thin nowrap text-right">{formatDuration(task.executionTimeMs)}</td>;
   },
 
   isAnotherDay(a, b) {
     return !moment(a).isSame(moment(b), 'day');
   },
 
+  renderFilter(task) {
+    if (this.props.options && this.props.options.component) {
+      return null;
+    }
+    return <td className="thin nowrap">
+      <a onClick={this.handleFilter.bind(this, task)} className="icon-filter icon-half-transparent spacer-left" href="#"
+         title={`Show only "${task.componentName}" tasks`} data-toggle="tooltip"/>
+    </td>;
+  },
+
   renderCancelButton(task) {
     if (task.status === STATUSES.PENDING) {
       return (
-          <a onClick={this.onTaskCanceled.bind(this, task)} className="icon-delete" title="Cancel Task"
-             data-toggle="tooltip" href="#"></a>
+          <a onClick={this.onTaskCanceled.bind(this, task)} className="icon-delete"
+             title={window.t('background_tasks.cancel_task')} data-toggle="tooltip" href="#"></a>
       );
     } else {
       return null;
@@ -95,7 +116,7 @@ export default React.createClass({
   renderLogsLink(task) {
     if (task.logs) {
       let url = `${window.baseUrl}/api/ce/logs?taskId=${task.id}`;
-      return <a target="_blank" href={url}>Logs</a>;
+      return <a target="_blank" href={url}>{window.t('background_tasks.logs')}</a>;
     } else {
       return null;
     }
@@ -110,12 +131,13 @@ export default React.createClass({
           {this.renderTaskDay(task, previousTask)}
           {this.renderTaskDate(task, 'submittedAt', 'LTS')}
           {this.renderTaskDate(task, 'startedAt', 'LTS')}
-          {this.renderTaskDate(task, 'finishedAt', 'LTS')}
+          {this.renderTaskDate(task, 'executedAt', 'LTS')}
           {this.renderTaskExecutionTime(task)}
           <td className="thin nowrap text-right">
             {this.renderLogsLink(task)}
             {this.renderCancelButton(task)}
           </td>
+          {this.renderFilter(task)}
         </tr>
     );
   },
@@ -132,10 +154,10 @@ export default React.createClass({
             <th>&nbsp;</th>
             <th>&nbsp;</th>
             <th>&nbsp;</th>
-            <th>Submitted</th>
-            <th>Started</th>
-            <th>Finished</th>
-            <th>Duration</th>
+            <th>{window.t('background_tasks.table.submitted')}</th>
+            <th>{window.t('background_tasks.table.started')}</th>
+            <th>{window.t('background_tasks.table.finished')}</th>
+            <th>{window.t('background_tasks.table.duration')}</th>
             <th>&nbsp;</th>
           </tr>
           </thead>

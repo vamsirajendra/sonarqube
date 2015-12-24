@@ -20,37 +20,47 @@
 
 package org.sonar.server.computation.source;
 
-import org.sonar.batch.protocol.output.BatchReport;
+import javax.annotation.CheckForNull;
 import org.sonar.db.protobuf.DbFileSources;
+import org.sonar.server.computation.scm.Changeset;
+import org.sonar.server.computation.scm.ScmInfo;
 
 public class ScmLineReader implements LineReader {
 
-  private final BatchReport.Changesets scmReport;
+  private final ScmInfo scmReport;
+  @CheckForNull
+  private Changeset latestChange;
 
-  public ScmLineReader(BatchReport.Changesets scmReport) {
+  public ScmLineReader(ScmInfo scmReport) {
     this.scmReport = scmReport;
   }
 
   @Override
   public void read(DbFileSources.Line.Builder lineBuilder) {
-    int changeSetIndex = scmReport.getChangesetIndexByLine(lineBuilder.getLine() - 1);
-    BatchReport.Changesets.Changeset changeset = scmReport.getChangeset(changeSetIndex);
-    boolean hasAuthor = changeset.hasAuthor();
-    if (hasAuthor) {
-      lineBuilder.setScmAuthor(changeset.getAuthor());
+    Changeset changeset = scmReport.getChangesetForLine(lineBuilder.getLine());
+    String author = changeset.getAuthor();
+    if (author != null) {
+      lineBuilder.setScmAuthor(author);
     }
-    boolean hasRevision = changeset.hasRevision();
-    if (hasRevision) {
-      lineBuilder.setScmRevision(changeset.getRevision());
-    }
-    boolean hasDate = changeset.hasDate();
-    if (hasDate) {
-      lineBuilder.setScmDate(changeset.getDate());
-    }
+    lineBuilder.setScmRevision(changeset.getRevision());
+    lineBuilder.setScmDate(changeset.getDate());
+    updateLatestChange(changeset);
+  }
 
-    if (!hasAuthor && !hasRevision && !hasDate) {
-      throw new IllegalArgumentException("A changeset must contains at least one of : author, revision or date");
+  private void updateLatestChange(Changeset newChangeSet) {
+    if (latestChange == null) {
+      latestChange = newChangeSet;
+    } else {
+      long newChangesetDate = newChangeSet.getDate();
+      long latestChangeDate = latestChange.getDate();
+      if (newChangesetDate > latestChangeDate) {
+        latestChange = newChangeSet;
+      }
     }
   }
 
+  @CheckForNull
+  public Changeset getLatestChange() {
+    return latestChange;
+  }
 }

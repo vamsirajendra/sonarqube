@@ -1,8 +1,8 @@
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/api-documentation-layout.hbs';
 
 export default Marionette.LayoutView.extend({
-  template: Templates['api-documentation-layout'],
+  template: Template,
 
   regions: {
     headerRegion: '.search-navigator-workspace-header',
@@ -20,5 +20,3 @@ export default Marionette.LayoutView.extend({
     this.$('.search-navigator-side').css({ top: top }).isolatedScroll();
   }
 });
-
-

@@ -29,11 +29,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
+import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.utils.System2;
 import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.db.DbTester;
+import org.sonar.db.component.ResourceTypesRule;
 import org.sonar.db.permission.PermissionQuery;
 import org.sonar.db.permission.PermissionTemplateDto;
 import org.sonar.db.permission.UserWithPermissionDto;
@@ -44,8 +46,8 @@ import org.sonar.server.exceptions.ForbiddenException;
 import org.sonar.server.exceptions.NotFoundException;
 import org.sonar.server.exceptions.UnauthorizedException;
 import org.sonar.server.permission.ws.PermissionDependenciesFinder;
-import org.sonar.server.permission.ws.WsPermissionParameters;
 import org.sonar.server.tester.UserSessionRule;
+import org.sonar.server.usergroups.ws.UserGroupFinder;
 import org.sonar.server.ws.TestRequest;
 import org.sonar.server.ws.WsActionTester;
 import org.sonar.test.DbTests;
@@ -57,9 +59,9 @@ import static org.sonar.api.web.UserRole.ISSUE_ADMIN;
 import static org.sonar.db.permission.PermissionTemplateTesting.newPermissionTemplateDto;
 import static org.sonar.db.user.GroupMembershipQuery.IN;
 import static org.sonar.db.user.UserTesting.newUserDto;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PERMISSION;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_TEMPLATE_NAME;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_USER_LOGIN;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PERMISSION;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_USER_LOGIN;
 
 @Category(DbTests.class)
 public class AddUserToTemplateActionTest {
@@ -71,6 +73,7 @@ public class AddUserToTemplateActionTest {
   public ExpectedException expectedException = ExpectedException.none();
   @Rule
   public UserSessionRule userSession = UserSessionRule.standalone();
+  ResourceTypesRule resourceTypes = new ResourceTypesRule().setRootQualifiers(Qualifiers.PROJECT, Qualifiers.VIEW, "DEV");
 
   WsActionTester ws;
   DbClient dbClient;
@@ -84,7 +87,7 @@ public class AddUserToTemplateActionTest {
     dbSession = db.getSession();
     userSession.login().setGlobalPermissions(GlobalPermissions.SYSTEM_ADMIN);
 
-    PermissionDependenciesFinder dependenciesFinder = new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient));
+    PermissionDependenciesFinder dependenciesFinder = new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient), new UserGroupFinder(dbClient), resourceTypes);
     ws = new WsActionTester(new AddUserToTemplateAction(dbClient, dependenciesFinder, userSession));
 
     user = insertUser(newUserDto().setLogin(USER_LOGIN));
@@ -185,10 +188,10 @@ public class AddUserToTemplateActionTest {
       request.setParam(PARAM_USER_LOGIN, userLogin);
     }
     if (templateKey != null) {
-      request.setParam(WsPermissionParameters.PARAM_TEMPLATE_UUID, templateKey);
+      request.setParam(org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_ID, templateKey);
     }
     if (permission != null) {
-      request.setParam(WsPermissionParameters.PARAM_PERMISSION, permission);
+      request.setParam(PARAM_PERMISSION, permission);
     }
 
     request.execute();

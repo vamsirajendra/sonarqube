@@ -25,8 +25,10 @@ import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.ibatis.session.RowBounds;
@@ -37,7 +39,9 @@ import org.sonar.db.DatabaseUtils;
 import org.sonar.db.DbSession;
 import org.sonar.db.RowNotFoundException;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Maps.newHashMapWithExpectedSize;
+import static org.sonar.api.utils.Paging.offset;
 import static org.sonar.db.DatabaseUtils.executeLargeInputs;
 
 public class ComponentDao implements Dao {
@@ -64,6 +68,14 @@ public class ComponentDao implements Dao {
       throw new RowNotFoundException(String.format("Component with uuid '%s' not found", uuid));
     }
     return componentDto.get();
+  }
+
+  public List<ComponentDto> selectByQuery(DbSession session, ComponentQuery query, int offset, int limit) {
+    return mapper(session).selectByQuery(query, new RowBounds(offset, limit));
+  }
+
+  public int countByQuery(DbSession session, ComponentQuery query) {
+    return mapper(session).countByQuery(query);
   }
 
   public boolean existsById(Long id, DbSession session) {
@@ -139,6 +151,24 @@ public class ComponentDao implements Dao {
     return mapper(session).selectComponentsHavingSameKeyOrderedById(key);
   }
 
+  public List<ComponentDto> selectDirectChildren(DbSession dbSession, ComponentTreeQuery componentQuery) {
+    RowBounds rowBounds = new RowBounds(offset(componentQuery.getPage(), componentQuery.getPageSize()), componentQuery.getPageSize());
+    return mapper(dbSession).selectDirectChildren(componentQuery, rowBounds);
+  }
+
+  public List<ComponentDto> selectAllChildren(DbSession dbSession, ComponentTreeQuery componentQuery) {
+    RowBounds rowBounds = new RowBounds(offset(componentQuery.getPage(), componentQuery.getPageSize()), componentQuery.getPageSize());
+    return mapper(dbSession).selectAllChildren(componentQuery, rowBounds);
+  }
+
+  public int countDirectChildren(DbSession dbSession, ComponentTreeQuery query) {
+    return mapper(dbSession).countDirectChildren(query);
+  }
+
+  public int countAllChildren(DbSession dbSession, ComponentTreeQuery query) {
+    return mapper(dbSession).countAllChildren(query);
+  }
+
   private static class KeyToDto implements Function<List<String>, List<ComponentDto>> {
     private final ComponentMapper mapper;
 
@@ -186,7 +216,7 @@ public class ComponentDao implements Dao {
    * Does not return component copies
    */
   public List<ComponentDto> selectComponents(DbSession session, Collection<String> qualifiers, int offset, int limit, @Nullable String query) {
-    Map<String, Object> parameters = newHashMapWithExpectedSize(2);
+    Map<String, Object> parameters = newHashMapWithExpectedSize(3);
     addProjectQualifier(parameters);
     addPartialQueryParameterIfNotNull(parameters, query);
     addQualifiers(parameters, qualifiers);
@@ -241,6 +271,16 @@ public class ComponentDao implements Dao {
    */
   public List<ComponentDto> selectByProjectUuid(String projectUuid, DbSession dbSession) {
     return mapper(dbSession).selectByProjectUuid(projectUuid);
+  }
+
+  /**
+   * Retrieve enabled components keys with given qualifiers
+   *
+   * Used by Views plugin
+   */
+  public Set<ComponentDto> selectComponentsByQualifiers(DbSession dbSession, Set<String> qualifiers) {
+    checkArgument(!qualifiers.isEmpty(), "Qualifiers cannot be empty");
+    return new HashSet<>(mapper(dbSession).selectComponentsByQualifiers(qualifiers));
   }
 
   private static void addPartialQueryParameterIfNotNull(Map<String, Object> parameters, @Nullable String keyOrNameFilter) {

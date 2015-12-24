@@ -1,10 +1,10 @@
 import _ from 'underscore';
-import ModalForm from 'components/common/modal-form';
-import Metrics from 'apps/metrics/metrics';
-import './templates';
+import ModalForm from '../../components/common/modal-form';
+import Metrics from '../metrics/metrics';
+import Template from './templates/custom-measures-form.hbs';
 
 export default ModalForm.extend({
-  template: Templates['custom-measures-form'],
+  template: Template,
 
   initialize: function () {
     this.metrics = new Metrics();
@@ -13,7 +13,7 @@ export default ModalForm.extend({
   },
 
   onRender: function () {
-    this._super();
+    ModalForm.prototype.onRender.apply(this, arguments);
     this.$('[data-toggle="tooltip"]').tooltip({ container: 'body', placement: 'bottom' });
     this.$('#create-custom-measure-metric').select2({
       width: '250px',
@@ -22,12 +22,12 @@ export default ModalForm.extend({
   },
 
   onDestroy: function () {
-    this._super();
+    ModalForm.prototype.onDestroy.apply(this, arguments);
     this.$('[data-toggle="tooltip"]').tooltip('destroy');
   },
 
-  onFormSubmit: function (e) {
-    this._super(e);
+  onFormSubmit: function () {
+    ModalForm.prototype.onFormSubmit.apply(this, arguments);
     this.sendRequest();
   },
 
@@ -41,7 +41,7 @@ export default ModalForm.extend({
   serializeData: function () {
     var metrics = this.getAvailableMetrics(),
         isNew = !this.model;
-    return _.extend(this._super(), {
+    return _.extend(ModalForm.prototype.serializeData.apply(this, arguments), {
       metrics: metrics,
       canCreateMetric: !isNew || (isNew && metrics.length > 0)
     });

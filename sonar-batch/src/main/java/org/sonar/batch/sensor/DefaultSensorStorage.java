@@ -37,8 +37,6 @@ import org.sonar.api.batch.measure.MetricFinder;
 import org.sonar.api.batch.rule.ActiveRules;
 import org.sonar.api.batch.sensor.coverage.CoverageType;
 import org.sonar.api.batch.sensor.coverage.internal.DefaultCoverage;
-import org.sonar.api.batch.sensor.duplication.Duplication;
-import org.sonar.api.batch.sensor.duplication.internal.DefaultDuplication;
 import org.sonar.api.batch.sensor.highlighting.internal.DefaultHighlighting;
 import org.sonar.api.batch.sensor.highlighting.internal.SyntaxHighlightingRule;
 import org.sonar.api.batch.sensor.internal.SensorStorage;
@@ -53,7 +51,6 @@ import org.sonar.api.resources.Resource;
 import org.sonar.api.source.Symbol;
 import org.sonar.api.utils.KeyValueFormat;
 import org.sonar.api.utils.SonarException;
-import org.sonar.batch.duplication.DuplicationCache;
 import org.sonar.batch.index.BatchComponent;
 import org.sonar.batch.index.BatchComponentCache;
 import org.sonar.batch.issue.ModuleIssues;
@@ -94,19 +91,17 @@ public class DefaultSensorStorage implements SensorStorage {
   private final MetricFinder metricFinder;
   private final ModuleIssues moduleIssues;
   private final CoverageExclusions coverageExclusions;
-  private final DuplicationCache duplicationCache;
-  private final BatchComponentCache resourceCache;
+  private final BatchComponentCache componentCache;
   private final ReportPublisher reportPublisher;
   private final MeasureCache measureCache;
 
   public DefaultSensorStorage(MetricFinder metricFinder, ModuleIssues moduleIssues,
-    Settings settings, FileSystem fs, ActiveRules activeRules, DuplicationCache duplicationCache,
-    CoverageExclusions coverageExclusions, BatchComponentCache resourceCache, ReportPublisher reportPublisher, MeasureCache measureCache) {
+    Settings settings, FileSystem fs, ActiveRules activeRules,
+    CoverageExclusions coverageExclusions, BatchComponentCache componentCache, ReportPublisher reportPublisher, MeasureCache measureCache) {
     this.metricFinder = metricFinder;
     this.moduleIssues = moduleIssues;
     this.coverageExclusions = coverageExclusions;
-    this.duplicationCache = duplicationCache;
-    this.resourceCache = resourceCache;
+    this.componentCache = componentCache;
     this.reportPublisher = reportPublisher;
     this.measureCache = measureCache;
   }
@@ -127,7 +122,7 @@ public class DefaultSensorStorage implements SensorStorage {
     setValueAccordingToMetricType(newMeasure, m, measureToSave);
     measureToSave.setFromCore(measure.isFromCore());
     InputComponent inputComponent = newMeasure.inputComponent();
-    Resource resource = resourceCache.get(inputComponent).resource();
+    Resource resource = componentCache.get(inputComponent).resource();
     if (coverageExclusions.accept(resource, measureToSave)) {
       saveMeasure(resource, measureToSave);
     }
@@ -183,7 +178,7 @@ public class DefaultSensorStorage implements SensorStorage {
   }
 
   private File getFile(InputFile file) {
-    BatchComponent r = resourceCache.get(file);
+    BatchComponent r = componentCache.get(file);
     if (r == null) {
       throw new IllegalStateException("Provided input file is not indexed");
     }
@@ -191,21 +186,16 @@ public class DefaultSensorStorage implements SensorStorage {
   }
 
   @Override
-  public void store(Duplication duplication) {
-    duplicationCache.put(duplication.originBlock().resourceKey(), (DefaultDuplication) duplication);
-  }
-
-  @Override
   public void store(DefaultHighlighting highlighting) {
     BatchReportWriter writer = reportPublisher.getWriter();
     DefaultInputFile inputFile = (DefaultInputFile) highlighting.inputFile();
-    writer.writeComponentSyntaxHighlighting(resourceCache.get(inputFile).batchId(),
+    writer.writeComponentSyntaxHighlighting(componentCache.get(inputFile).batchId(),
       Iterables.transform(highlighting.getSyntaxHighlightingRuleSet(), new BuildSyntaxHighlighting()));
   }
 
   public void store(DefaultInputFile inputFile, Map<Symbol, Set<TextRange>> referencesBySymbol) {
     BatchReportWriter writer = reportPublisher.getWriter();
-    writer.writeComponentSymbols(resourceCache.get(inputFile).batchId(),
+    writer.writeComponentSymbols(componentCache.get(inputFile).batchId(),
       Iterables.transform(referencesBySymbol.entrySet(), new Function<Map.Entry<Symbol, Set<TextRange>>, BatchReport.Symbol>() {
         private BatchReport.Symbol.Builder builder = BatchReport.Symbol.newBuilder();
         private BatchReport.TextRange.Builder rangeBuilder = BatchReport.TextRange.newBuilder();

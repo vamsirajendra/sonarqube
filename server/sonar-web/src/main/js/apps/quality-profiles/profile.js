@@ -17,8 +17,8 @@ export default Backbone.Model.extend({
         this.fetchProfileRules(),
         this.fetchInheritance()
     ).done(function () {
-          that.set(that.fetchChanged);
-        });
+      that.set(that.fetchChanged);
+    });
   },
 
   fetchProfileRules: function () {
@@ -86,7 +86,6 @@ export default Backbone.Model.extend({
     });
   },
 
-
   resetChangelog: function () {
     this.unset('events', { silent: true });
     this.unset('eventsPage', { silent: true });
@@ -108,7 +107,10 @@ export default Backbone.Model.extend({
         comparedWith: withKey
       });
     });
+  },
+
+  resetComparison: function () {
+    this.unset('comparedWith', { silent: true });
+    this.unset('comparison');
   }
 });
-
-

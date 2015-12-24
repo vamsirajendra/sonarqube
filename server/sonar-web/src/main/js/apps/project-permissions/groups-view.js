@@ -1,17 +1,17 @@
 import _ from 'underscore';
-import Modal from 'components/common/modals';
-import 'components/common/select-list';
-import './templates';
+import Modal from '../../components/common/modals';
+import '../../components/common/select-list';
+import Template from './templates/project-permissions-groups.hbs';
 
 function getSearchUrl (permission, project) {
   return baseUrl + '/api/permissions/groups?ps=100&permission=' + permission + '&projectId=' + project;
 }
 
 export default Modal.extend({
-  template: Templates['project-permissions-groups'],
+  template: Template,
 
   onRender: function () {
-    this._super();
+    Modal.prototype.onRender.apply(this, arguments);
     new window.SelectList({
       el: this.$('#project-permissions-groups'),
       width: '100%',
@@ -41,7 +41,7 @@ export default Modal.extend({
     if (this.options.refresh) {
       this.options.refresh();
     }
-    this._super();
+    Modal.prototype.onDestroy.apply(this, arguments);
   },
 
   serializeData: function () {

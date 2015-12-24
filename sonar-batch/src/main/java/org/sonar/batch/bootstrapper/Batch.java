@@ -19,6 +19,9 @@
  */
 package org.sonar.batch.bootstrapper;
 
+import org.sonar.api.utils.MessageException;
+
+import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -89,14 +92,18 @@ public final class Batch {
     return start(false);
   }
 
-  public synchronized Batch start(boolean forceSync) {
+  public synchronized Batch start(boolean preferCache) {
     if (started) {
       throw new IllegalStateException("Batch is already started");
     }
 
     configureLogging();
-    bootstrapContainer = GlobalContainer.create(bootstrapProperties, components, forceSync);
-    bootstrapContainer.startComponents();
+    try {
+      bootstrapContainer = GlobalContainer.create(bootstrapProperties, components, preferCache);
+      bootstrapContainer.startComponents();
+    } catch (RuntimeException e) {
+      throw handleException(e);
+    }
     this.started = true;
 
     return this;
@@ -107,7 +114,12 @@ public final class Batch {
    */
   public Batch executeTask(Map<String, String> analysisProperties, Object... components) {
     checkStarted();
-    bootstrapContainer.executeAnalysis(analysisProperties, components);
+    configureTaskLogging(analysisProperties);
+    try {
+      bootstrapContainer.executeTask(analysisProperties, components);
+    } catch (RuntimeException e) {
+      throw handleException(e);
+    }
     return this;
   }
 
@@ -116,7 +128,12 @@ public final class Batch {
    */
   public Batch executeTask(Map<String, String> analysisProperties, IssueListener issueListener) {
     checkStarted();
-    bootstrapContainer.executeAnalysis(analysisProperties, components, issueListener);
+    configureTaskLogging(analysisProperties);
+    try {
+      bootstrapContainer.executeTask(analysisProperties, components, issueListener);
+    } catch (RuntimeException e) {
+      throw handleException(e);
+    }
     return this;
   }
 
@@ -124,6 +141,20 @@ public final class Batch {
     if (!started) {
       throw new IllegalStateException("Batch is not started. Unable to execute task.");
     }
+  }
+
+  private RuntimeException handleException(RuntimeException t) {
+    if (loggingConfig.isVerbose()) {
+      return t;
+    }
+
+    for (Throwable y : Throwables.getCausalChain(t)) {
+      if (y instanceof MessageException) {
+        return (MessageException) y;
+      }
+    }
+
+    return t;
   }
 
   /**
@@ -144,12 +175,25 @@ public final class Batch {
 
   private void doStop(boolean swallowException) {
     checkStarted();
-    bootstrapContainer.stopComponents(swallowException);
+    configureLogging();
+    try {
+      bootstrapContainer.stopComponents(swallowException);
+    } catch (RuntimeException e) {
+      throw handleException(e);
+    }
     this.started = false;
   }
 
   private void configureLogging() {
     if (loggingConfig != null) {
+      loggingConfig.setProperties(bootstrapProperties);
+      LoggingConfigurator.apply(loggingConfig);
+    }
+  }
+
+  private void configureTaskLogging(Map<String, String> taskProperties) {
+    if (loggingConfig != null) {
+      loggingConfig.setProperties(taskProperties, bootstrapProperties);
       LoggingConfigurator.apply(loggingConfig);
     }
   }

@@ -27,12 +27,19 @@ import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.server.permission.PermissionChange;
 import org.sonar.server.permission.PermissionUpdater;
-import org.sonar.server.permission.ws.PermissionRequest.Builder;
+import org.sonarqube.ws.client.permission.AddGroupWsRequest;
 
-import static org.sonar.server.permission.ws.WsPermissionParameters.createGroupIdParameter;
-import static org.sonar.server.permission.ws.WsPermissionParameters.createGroupNameParameter;
-import static org.sonar.server.permission.ws.WsPermissionParameters.createPermissionParameter;
-import static org.sonar.server.permission.ws.WsPermissionParameters.createProjectParameter;
+import static org.sonar.server.permission.ws.PermissionsWsParametersBuilder.createGroupIdParameter;
+import static org.sonar.server.permission.ws.PermissionsWsParametersBuilder.createGroupNameParameter;
+import static org.sonar.server.permission.ws.PermissionsWsParametersBuilder.createPermissionParameter;
+import static org.sonar.server.permission.ws.PermissionsWsParametersBuilder.createProjectParameter;
+import static org.sonar.server.permission.ws.WsProjectRef.newOptionalWsProjectRef;
+import static org.sonar.server.usergroups.ws.WsGroupRef.newWsGroupRef;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_GROUP_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_GROUP_NAME;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PERMISSION;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PROJECT_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PROJECT_KEY;
 
 public class AddGroupAction implements PermissionsWsAction {
 
@@ -67,15 +74,33 @@ public class AddGroupAction implements PermissionsWsAction {
 
   @Override
   public void handle(Request request, Response response) throws Exception {
+    AddGroupWsRequest addGroupWsRequest = toAddGroupWsRequest(request);
+    doHandle(addGroupWsRequest);
+
+    response.noContent();
+  }
+
+  private void doHandle(AddGroupWsRequest request) {
     DbSession dbSession = dbClient.openSession(false);
     try {
-      PermissionRequest permissionRequest = new Builder(request).withGroup().build();
-      PermissionChange permissionChange = permissionChangeBuilder.buildGroupPermissionChange(dbSession, permissionRequest);
+      Long groupId = request.getGroupId() == null ? null : Long.valueOf(request.getGroupId());
+      PermissionChange permissionChange = permissionChangeBuilder.buildGroupPermissionChange(
+        dbSession,
+        request.getPermission(),
+        newOptionalWsProjectRef(request.getProjectId(), request.getProjectKey()),
+        newWsGroupRef(groupId, request.getGroupName()));
       permissionUpdater.addPermission(permissionChange);
     } finally {
       dbClient.closeSession(dbSession);
     }
+  }
 
-    response.noContent();
+  private static AddGroupWsRequest toAddGroupWsRequest(Request request) {
+    return new AddGroupWsRequest()
+      .setPermission(request.mandatoryParam(PARAM_PERMISSION))
+      .setGroupId(request.param(PARAM_GROUP_ID))
+      .setGroupName(request.param(PARAM_GROUP_NAME))
+      .setProjectId(request.param(PARAM_PROJECT_ID))
+      .setProjectKey(request.param(PARAM_PROJECT_KEY));
   }
 }

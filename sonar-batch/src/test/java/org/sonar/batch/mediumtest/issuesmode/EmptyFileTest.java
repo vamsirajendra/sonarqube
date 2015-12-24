@@ -19,8 +19,9 @@
  */
 package org.sonar.batch.mediumtest.issuesmode;
 
-import org.apache.commons.io.filefilter.FileFilterUtils;
+import org.sonar.batch.issue.tracking.TrackedIssue;
 
+import org.apache.commons.io.filefilter.FileFilterUtils;
 import org.apache.commons.io.FileUtils;
 import org.sonar.xoo.rule.XooRulesDefinition;
 import com.google.common.collect.ImmutableMap;
@@ -33,7 +34,6 @@ import org.sonar.api.CoreProperties;
 import org.sonar.api.utils.log.LogTester;
 import org.sonar.batch.mediumtest.BatchMediumTester;
 import org.sonar.batch.mediumtest.TaskResult;
-import org.sonar.batch.protocol.input.ActiveRule;
 import org.sonar.xoo.XooPlugin;
 
 import java.io.File;
@@ -54,7 +54,7 @@ public class EmptyFileTest {
     .registerPlugin("xoo", new XooPlugin())
     .addRules(new XooRulesDefinition())
     .addDefaultQProfile("xoo", "Sonar Way")
-    .activateRule(new ActiveRule("xoo", "OneIssuePerLine", null, "One issue per line", "MAJOR", "my/internal/key", "xoo"))
+    .addActiveRule("xoo", "OneIssuePerLine", null, "One issue per line", "MAJOR", "my/internal/key", "xoo")
     .setPreviousAnalysisDate(new Date())
     .build();
 
@@ -77,6 +77,10 @@ public class EmptyFileTest {
       .property("sonar.xoo.internalKey", "my/internal/key")
       .start();
 
+    for(TrackedIssue i : result.trackedIssues()) {
+      System.out.println(i.startLine() + " " + i.getMessage());
+    }
+    
     assertThat(result.trackedIssues()).hasSize(11);
   }
 

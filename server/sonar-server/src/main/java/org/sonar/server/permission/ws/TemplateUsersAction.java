@@ -32,16 +32,17 @@ import org.sonar.db.permission.PermissionQuery;
 import org.sonar.db.permission.PermissionTemplateDto;
 import org.sonar.db.permission.UserWithPermissionDto;
 import org.sonar.server.user.UserSession;
+import org.sonarqube.ws.WsPermissions;
 import org.sonarqube.ws.WsPermissions.User;
-import org.sonarqube.ws.WsPermissions.WsUsersResponse;
+import org.sonarqube.ws.WsPermissions.UsersWsResponse;
 
 import static java.lang.String.format;
 import static org.sonar.server.permission.PermissionPrivilegeChecker.checkGlobalAdminUser;
 import static org.sonar.server.permission.ws.PermissionQueryParser.fromSelectionModeToMembership;
 import static org.sonar.server.permission.ws.PermissionRequestValidator.validateProjectPermission;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PERMISSION;
-import static org.sonar.server.permission.ws.WsPermissionParameters.createProjectPermissionParameter;
-import static org.sonar.server.permission.ws.WsPermissionParameters.createTemplateParameters;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PERMISSION;
+import static org.sonar.server.permission.ws.PermissionsWsParametersBuilder.createProjectPermissionParameter;
+import static org.sonar.server.permission.ws.PermissionsWsParametersBuilder.createTemplateParameters;
 import static org.sonar.server.ws.WsUtils.writeProtobuf;
 
 public class TemplateUsersAction implements PermissionsWsAction {
@@ -70,7 +71,7 @@ public class TemplateUsersAction implements PermissionsWsAction {
       .addSearchQuery("stas", "names")
       .addSelectionModeParam()
       .setInternal(true)
-      .setResponseExample(getClass().getResource("template-users-example.json"))
+      .setResponseExample(getClass().getResource("template_users-example.json"))
       .setHandler(this);
 
     createProjectPermissionParameter(action);
@@ -86,7 +87,7 @@ public class TemplateUsersAction implements PermissionsWsAction {
       PermissionTemplateDto template = dependenciesFinder.getTemplate(dbSession, templateRef);
 
       PermissionQuery query = buildQuery(wsRequest, template);
-      WsUsersResponse templateUsersResponse = buildResponse(dbSession, query, template);
+      WsPermissions.UsersWsResponse templateUsersResponse = buildResponse(dbSession, query, template);
       writeProtobuf(templateUsersResponse, wsRequest, wsResponse);
     } finally {
       dbClient.closeSession(dbSession);
@@ -106,11 +107,11 @@ public class TemplateUsersAction implements PermissionsWsAction {
       .build();
   }
 
-  private WsUsersResponse buildResponse(DbSession dbSession, PermissionQuery query, PermissionTemplateDto template) {
+  private WsPermissions.UsersWsResponse buildResponse(DbSession dbSession, PermissionQuery query, PermissionTemplateDto template) {
     List<UserWithPermissionDto> usersWithPermission = dbClient.permissionTemplateDao().selectUsers(dbSession, query, template.getId(), query.pageOffset(), query.pageSize());
     int total = dbClient.permissionTemplateDao().countUsers(dbSession, query, template.getId());
 
-    WsUsersResponse.Builder responseBuilder = WsUsersResponse.newBuilder();
+    UsersWsResponse.Builder responseBuilder = UsersWsResponse.newBuilder();
     for (UserWithPermissionDto userWithPermission : usersWithPermission) {
       responseBuilder.addUsers(userDtoToUserResponse(userWithPermission));
     }

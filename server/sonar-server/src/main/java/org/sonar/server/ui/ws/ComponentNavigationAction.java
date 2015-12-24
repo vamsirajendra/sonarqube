@@ -50,6 +50,7 @@ import org.sonar.db.dashboard.DashboardDto;
 import org.sonar.db.property.PropertyDto;
 import org.sonar.db.property.PropertyQuery;
 import org.sonar.server.component.ComponentFinder;
+import org.sonar.server.computation.ws.ActivityAction;
 import org.sonar.server.ui.ViewProxy;
 import org.sonar.server.ui.Views;
 import org.sonar.server.user.UserSession;
@@ -76,7 +77,7 @@ public class ComponentNavigationAction implements NavigationWsAction {
   private final ComponentFinder componentFinder;
 
   public ComponentNavigationAction(DbClient dbClient, Views views, I18n i18n, ResourceTypes resourceTypes, UserSession userSession,
-                                   ComponentFinder componentFinder) {
+    ComponentFinder componentFinder) {
     this.dbClient = dbClient;
     this.activeDashboardDao = dbClient.activeDashboardDao();
     this.views = views;
@@ -144,13 +145,14 @@ public class ComponentNavigationAction implements NavigationWsAction {
     if (dashboards.isEmpty()) {
       dashboards = activeDashboardDao.selectProjectDashboardsForUserLogin(session, ANONYMOUS);
     }
-    writeDashboards(json, component, dashboards, userSession.locale());
+    writeDashboards(json, dashboards);
 
     if (snapshot != null) {
       json.prop("version", snapshot.getVersion())
         .prop("snapshotDate", DateUtils.formatDateTime(new Date(snapshot.getCreatedAt())));
-      String[] availableMeasures = dbClient.measureDao().selectMetricKeysForSnapshot(session, snapshot.getId()).toArray(new String[0]);
-      List<ViewProxy<Page>> pages = views.getPages(NavigationSection.RESOURCE, component.scope(), component.qualifier(), component.language(), availableMeasures);
+      List<String> availableMeasures = dbClient.measureDao().selectMetricKeysForSnapshot(session, snapshot.getId());
+      List<ViewProxy<Page>> pages = views.getPages(NavigationSection.RESOURCE, component.scope(), component.qualifier(), component.language(),
+        availableMeasures.toArray(new String[availableMeasures.size()]));
       writeExtensions(json, component, pages, userSession.locale());
     }
   }
@@ -175,8 +177,8 @@ public class ComponentNavigationAction implements NavigationWsAction {
     json.endArray();
   }
 
-  private String getPageUrl(ViewProxy<Page> page, ComponentDto component) {
-    String result = null;
+  private static String getPageUrl(ViewProxy<Page> page, ComponentDto component) {
+    String result;
     String componentKey = encodeComponentKey(component);
     if (page.isController()) {
       result = String.format("%s?id=%s", page.getId(), componentKey);
@@ -196,7 +198,7 @@ public class ComponentNavigationAction implements NavigationWsAction {
     return componentKey;
   }
 
-  private void writeDashboards(JsonWriter json, ComponentDto component, List<DashboardDto> dashboards, Locale locale) {
+  private static void writeDashboards(JsonWriter json, List<DashboardDto> dashboards) {
     json.name("dashboards").beginArray();
     for (DashboardDto dashboard : dashboards) {
       json.beginObject()
@@ -212,7 +214,7 @@ public class ComponentNavigationAction implements NavigationWsAction {
     Locale locale = userSession.locale();
 
     json.name("configuration").beginObject();
-    writeConfigPageAccess(json, isAdmin, component, userSession);
+    writeConfigPageAccess(json, isAdmin, component);
 
     if (isAdmin) {
       json.name("extensions").beginArray();
@@ -225,7 +227,7 @@ public class ComponentNavigationAction implements NavigationWsAction {
     json.endObject();
   }
 
-  private void writeConfigPageAccess(JsonWriter json, boolean isAdmin, ComponentDto component, UserSession userSession) {
+  private void writeConfigPageAccess(JsonWriter json, boolean isAdmin, ComponentDto component) {
     boolean isProject = Qualifiers.PROJECT.equals(component.qualifier());
 
     json.prop("showSettings", isAdmin && componentTypeHasProperty(component, PROPERTY_CONFIGURABLE));
@@ -238,14 +240,12 @@ public class ComponentNavigationAction implements NavigationWsAction {
     json.prop("showHistory", isAdmin && componentTypeHasProperty(component, PROPERTY_MODIFIABLE_HISTORY));
     json.prop("showUpdateKey", isAdmin && componentTypeHasProperty(component, PROPERTY_UPDATABLE_KEY));
     json.prop("showDeletion", isAdmin && componentTypeHasProperty(component, PROPERTY_DELETABLE));
+    json.prop("showBackgroundTasks", ActivityAction.isAllowedOnComponentUuid(userSession, component.uuid()));
   }
 
   private boolean componentTypeHasProperty(ComponentDto component, String resourceTypeProperty) {
     ResourceType resourceType = resourceTypes.get(component.qualifier());
-    if (resourceType != null) {
-      return resourceType.getBooleanProperty(resourceTypeProperty);
-    }
-    return false;
+    return resourceType != null && resourceType.getBooleanProperty(resourceTypeProperty);
   }
 
   private void writePage(JsonWriter json, String url, String name) {

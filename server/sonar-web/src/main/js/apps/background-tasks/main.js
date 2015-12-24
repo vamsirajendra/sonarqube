@@ -1,14 +1,18 @@
 import _ from 'underscore';
+import moment from 'moment';
 import React from 'react';
-import {getQueue, getActivity, cancelTask, cancelAllTasks} from '../../api/ce';
-import {STATUSES, CURRENTS, DATE} from './constants';
+
+import { getQueue, getActivity, cancelTask, cancelAllTasks } from '../../api/ce';
+import { STATUSES, CURRENTS, DATE, DEBOUNCE_DELAY } from './constants';
 import Header from './header';
 import Stats from './stats';
 import Search from './search';
 import Tasks from './tasks';
 import ListFooter from '../../components/shared/list-footer';
 
+
 const PAGE_SIZE = 200;
+
 
 export default React.createClass({
   getInitialState() {
@@ -19,27 +23,19 @@ export default React.createClass({
       activityPage: 1,
       statusFilter: STATUSES.ALL,
       currentsFilter: CURRENTS.ALL,
-      dateFilter: DATE.ANY
+      dateFilter: DATE.ANY,
+      searchQuery: ''
     };
-  },
-
-  filterQueueForComponent(queue) {
-    if (this.props.options.componentId) {
-      return queue.filter(task => {
-        return task.componentId === this.props.options.componentId;
-      });
-    } else {
-      return queue;
-    }
   },
 
   componentDidMount() {
     this.requestData();
+    this.requestData = _.debounce(this.requestData, DEBOUNCE_DELAY);
   },
 
   getComponentFilter() {
-    if (this.props.options.componentId) {
-      return { componentId: this.props.options.componentId };
+    if (this.props.options.component) {
+      return { componentId: this.props.options.component.id };
     } else {
       return {};
     }
@@ -57,7 +53,7 @@ export default React.createClass({
           filter.minSubmittedAt = moment(this.state.minDate).format(DATE_FORMAT);
         }
         if (this.state.maxDate) {
-          filter.maxFinishedAt = moment(this.state.maxDate).format(DATE_FORMAT);
+          filter.maxExecutedAt = moment(this.state.maxDate).format(DATE_FORMAT);
         }
         break;
       default:
@@ -77,6 +73,9 @@ export default React.createClass({
     if (this.state.dateFilter !== DATE.ANY) {
       _.extend(filters, this.getDateFilter());
     }
+    if (this.state.searchQuery) {
+      _.extend(filters, { componentQuery: this.state.searchQuery });
+    }
     return filters;
   },
 
@@ -87,9 +86,10 @@ export default React.createClass({
   },
 
   requestQueue() {
+    let filters = this.getComponentFilter();
     if (!Object.keys(this.getCurrentFilters()).length) {
-      getQueue().done(queue => {
-        let tasks = this.filterQueueForComponent(queue.tasks);
+      getQueue(filters).done(queue => {
+        let tasks = queue.tasks;
         this.setState({
           queue: this.orderTasks(tasks),
           pendingCount: this.countPending(tasks),
@@ -138,7 +138,7 @@ export default React.createClass({
 
   getInProgressDuration(tasks) {
     let taskInProgress = _.findWhere(tasks, { status: STATUSES.IN_PROGRESS });
-    return taskInProgress ? moment().diff(taskInProgress.startedAt) : null;
+    return taskInProgress ? taskInProgress.executionTimeMs : null;
   },
 
   onStatusChange(newStatus) {
@@ -158,40 +158,64 @@ export default React.createClass({
     }, this.requestData);
   },
 
+  onSearch(query) {
+    this.setState({ searchQuery: query }, this.requestData);
+  },
+
   loadMore() {
     this.setState({ activityPage: this.state.activityPage + 1 }, this.requestActivity);
   },
 
   showFailures() {
     this.setState({
-          statusFilter: STATUSES.FAILED,
-          currentsFilter: CURRENTS.ONLY_CURRENTS,
-          activityPage: 1
-        },
-        this.requestActivity);
+      statusFilter: STATUSES.FAILED,
+      currentsFilter: CURRENTS.ONLY_CURRENTS,
+      activityPage: 1
+    }, this.requestActivity);
   },
 
   onTaskCanceled(task) {
-    cancelTask(task.id).done(data => {
-      _.extend(task, data.task);
-      this.forceUpdate();
-    });
+    cancelTask(task.id).then(this.requestData);
   },
 
   cancelPending() {
     cancelAllTasks().then(this.requestData);
   },
 
+  handleFilter(task) {
+    this.onSearch(task.componentKey);
+  },
+
   render() {
     return (
         <div className="page">
           <Header/>
-          <Stats {...this.state} cancelPending={this.cancelPending} showFailures={this.showFailures}/>
-          <Search {...this.state} onStatusChange={this.onStatusChange} onCurrentsChange={this.onCurrentsChange} onDateChange={this.onDateChange}/>
-          <Tasks tasks={[].concat(this.state.queue, this.state.activity)} onTaskCanceled={this.onTaskCanceled}/>
-          <ListFooter count={this.state.queue.length + this.state.activity.length}
-                      total={this.state.queue.length + this.state.activityTotal}
-                      loadMore={this.loadMore}/>
+
+          <Stats
+              {...this.props}
+              {...this.state}
+              cancelPending={this.cancelPending}
+              showFailures={this.showFailures}/>
+
+          <Search
+              {...this.props}
+              {...this.state}
+              refresh={this.requestData}
+              onStatusChange={this.onStatusChange}
+              onCurrentsChange={this.onCurrentsChange}
+              onDateChange={this.onDateChange}
+              onSearch={this.onSearch}/>
+
+          <Tasks
+              {...this.props}
+              tasks={[].concat(this.state.queue, this.state.activity)}
+              onTaskCanceled={this.onTaskCanceled}
+              onFilter={this.handleFilter}/>
+
+          <ListFooter
+              count={this.state.queue.length + this.state.activity.length}
+              total={this.state.queue.length + this.state.activityTotal}
+              loadMore={this.loadMore}/>
         </div>
     );
   }

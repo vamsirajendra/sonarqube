@@ -25,10 +25,12 @@ import java.util.List;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.rules.ExpectedException;
 import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.resources.Scopes;
 import org.sonar.api.utils.DateUtils;
 import org.sonar.api.utils.System2;
+import org.sonar.db.DbSession;
 import org.sonar.db.DbTester;
 import org.sonar.test.DbTests;
 
@@ -36,12 +38,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.sonar.db.component.SnapshotQuery.SORT_FIELD.BY_DATE;
 import static org.sonar.db.component.SnapshotQuery.SORT_ORDER.ASC;
 import static org.sonar.db.component.SnapshotQuery.SORT_ORDER.DESC;
+import static org.sonar.db.component.SnapshotTesting.newSnapshotForProject;
 
 @Category(DbTests.class)
 public class SnapshotDaoTest {
 
   @Rule
+  public ExpectedException expectedException = ExpectedException.none();
+
+  @Rule
   public DbTester db = DbTester.create(System2.INSTANCE);
+
+  DbSession dbSession = db.getSession();
 
   SnapshotDao underTest = db.getDbClient().snapshotDao();
 
@@ -156,6 +164,29 @@ public class SnapshotDaoTest {
 
     assertThat(underTest.selectSnapshotsByQuery(db.getSession(), new SnapshotQuery().setScope(Scopes.PROJECT).setQualifier(Qualifiers.PACKAGE))).extracting("id").containsOnly(1L);
     assertThat(underTest.selectSnapshotsByQuery(db.getSession(), new SnapshotQuery().setScope(Scopes.DIRECTORY).setQualifier(Qualifiers.PACKAGE))).extracting("id").containsOnly(2L, 3L, 4L, 5L, 6L);
+
+    assertThat(underTest.selectSnapshotsByQuery(db.getSession(), new SnapshotQuery().setComponentUuid("ABCD"))).hasSize(3);
+    assertThat(underTest.selectSnapshotsByQuery(db.getSession(), new SnapshotQuery().setComponentUuid("UNKOWN"))).isEmpty();
+    assertThat(underTest.selectSnapshotsByQuery(db.getSession(), new SnapshotQuery().setComponentUuid("GHIJ"))).isEmpty();
+  }
+
+  @Test
+  public void select_snapshot_by_query() {
+    db.prepareDbUnit(getClass(), "select_snapshots_by_query.xml");
+
+    assertThat(underTest.selectSnapshotsByQuery(db.getSession(), new SnapshotQuery().setComponentUuid("ABCD").setIsLast(true))).isNotNull();
+    assertThat(underTest.selectSnapshotByQuery(db.getSession(), new SnapshotQuery().setComponentUuid("UNKOWN"))).isNull();
+    assertThat(underTest.selectSnapshotByQuery(db.getSession(), new SnapshotQuery().setComponentUuid("GHIJ"))).isNull();
+  }
+
+  @Test
+  public void fail_with_ISE_to_select_snapshot_by_query_when_more_than_one_result() {
+    db.prepareDbUnit(getClass(), "select_snapshots_by_query.xml");
+
+    expectedException.expect(IllegalStateException.class);
+    expectedException.expectMessage("Expected one snapshot to be returned, got 6");
+
+    underTest.selectSnapshotByQuery(db.getSession(), new SnapshotQuery());
   }
 
   @Test
@@ -170,6 +201,25 @@ public class SnapshotDaoTest {
 
     // All snapshots are returned on an unknown version
     assertThat(underTest.selectPreviousVersionSnapshots(db.getSession(), 1L, "UNKNOWN")).hasSize(3);
+  }
+
+  @Test
+  public void select_first_snapshots() throws Exception {
+    ComponentDto project = ComponentTesting.newProjectDto();
+    db.getDbClient().componentDao().insert(dbSession, project);
+
+    db.getDbClient().snapshotDao().insert(dbSession,
+      newSnapshotForProject(project).setCreatedAt(5L),
+      newSnapshotForProject(project).setCreatedAt(2L),
+      newSnapshotForProject(project).setCreatedAt(1L)
+    );
+    dbSession.commit();
+
+    SnapshotDto dto = underTest.selectOldestSnapshot(dbSession, project.getId());
+    assertThat(dto).isNotNull();
+    assertThat(dto.getCreatedAt()).isEqualTo(1L);
+
+    assertThat(underTest.selectOldestSnapshot(dbSession, 123456789)).isNull();
   }
 
   @Test
@@ -259,6 +309,15 @@ public class SnapshotDaoTest {
     boolean isLast = SnapshotDao.isLast(snapshot, previousLastSnapshot);
 
     assertThat(isLast).isFalse();
+  }
+
+  @Test
+  public void has_last_snapshot_by_component_uuid() throws Exception {
+    db.prepareDbUnit(getClass(), "has_last_snapshot_by_component_uuid.xml");
+
+    assertThat(underTest.hasLastSnapshotByComponentUuid(db.getSession(), "ABCD")).isTrue();
+    assertThat(underTest.hasLastSnapshotByComponentUuid(db.getSession(), "EFGH")).isFalse();
+    assertThat(underTest.hasLastSnapshotByComponentUuid(db.getSession(), "FGHI")).isFalse();
   }
 
   private static SnapshotDto defaultSnapshot() {

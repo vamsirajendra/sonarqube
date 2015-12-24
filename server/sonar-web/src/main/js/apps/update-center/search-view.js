@@ -1,17 +1,17 @@
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/update-center-search.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['update-center-search'],
+  template: Template,
 
   events: {
     'change [name="update-center-filter"]': 'onFilterChange',
 
     'submit #update-center-search-form': 'onFormSubmit',
-    'search #update-center-search-query': 'debouncedOnKeyUp',
-    'keyup #update-center-search-query': 'debouncedOnKeyUp',
-    'change #update-center-search-query': 'debouncedOnKeyUp'
+    'search #update-center-search-query': 'onKeyUp',
+    'keyup #update-center-search-query': 'onKeyUp',
+    'change #update-center-search-query': 'onKeyUp'
   },
 
   collectionEvents: {
@@ -20,7 +20,7 @@ export default Marionette.ItemView.extend({
 
   initialize: function () {
     this._bufferedValue = null;
-    this.debouncedOnKeyUp = _.debounce(this.onKeyUp, 50);
+    this.search = _.debounce(this.search, 50);
     this.listenTo(this.options.state, 'change', this.render);
   },
 
@@ -77,7 +77,9 @@ export default Marionette.ItemView.extend({
   },
 
   serializeData: function () {
-    return _.extend(this._super(), { state: this.options.state.toJSON() });
+    return _.extend(Marionette.ItemView.prototype.serializeData.apply(this, arguments), {
+      state: this.options.state.toJSON()
+    });
   }
 });
 

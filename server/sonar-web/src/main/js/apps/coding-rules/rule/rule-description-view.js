@@ -1,10 +1,11 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import '../templates';
+import Template from '../templates/rule/coding-rules-rule-description.hbs';
+import confirmDialog from '../confirm-dialog';
 
 export default Marionette.ItemView.extend({
-  template: Templates['coding-rules-rule-description'],
+  template: Template,
 
   modelEvents: {
     'change': 'render'
@@ -62,8 +63,8 @@ export default Marionette.ItemView.extend({
 
   removeExtendedDescription: function () {
     var that = this;
-    window.confirmDialog({
-      html: t('coding_rules.remove_extended_description.confirm'),
+    confirmDialog({
+      html: window.t('coding_rules.remove_extended_description.confirm'),
       yesHandler: function () {
         that.ui.extendDescriptionText.val('');
         that.submitExtendDescription();
@@ -80,5 +81,3 @@ export default Marionette.ItemView.extend({
     });
   }
 });
-
-

@@ -20,10 +20,13 @@
 
 package org.sonar.server.permission.ws;
 
+import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import javax.annotation.Nullable;
+import org.sonar.api.resources.ResourceTypes;
 import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.core.permission.ProjectPermissions;
 import org.sonar.server.exceptions.BadRequestException;
@@ -32,10 +35,11 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.String.format;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.sonar.api.security.DefaultGroups.isAnyone;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PERMISSION;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_QUALIFIER;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PATTERN;
+import static org.sonar.server.component.ResourceTypeFunctions.RESOURCE_TYPE_TO_QUALIFIER;
 import static org.sonar.server.ws.WsUtils.checkRequest;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PERMISSION;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PROJECT_KEY_PATTERN;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_QUALIFIER;
 
 public class PermissionRequestValidator {
   public static final String MSG_TEMPLATE_WITH_SAME_NAME = "A template with the name '%s' already exists (case insensitive).";
@@ -43,6 +47,14 @@ public class PermissionRequestValidator {
 
   private PermissionRequestValidator() {
     // static methods only
+  }
+
+  public static void validatePermission(String permission, Optional<WsProjectRef> projectRef) {
+    if (projectRef.isPresent()) {
+      validateProjectPermission(permission);
+    } else {
+      validateGlobalPermission(permission);
+    }
   }
 
   public static String validateProjectPermission(String permission) {
@@ -70,6 +82,17 @@ public class PermissionRequestValidator {
       format("The '%s' parameter must be one of %s. '%s' was passed.", PARAM_QUALIFIER, rootQualifiers, qualifier));
   }
 
+  public static void validateQualifier(@Nullable String qualifier, ResourceTypes resourceTypes) {
+    if (qualifier == null) {
+      return;
+    }
+    Set<String> rootQualifiers = FluentIterable.from(resourceTypes.getRoots())
+      .transform(RESOURCE_TYPE_TO_QUALIFIER)
+      .toSet();
+    checkRequest(rootQualifiers.contains(qualifier),
+      format("The '%s' parameter must be one of %s. '%s' was passed.", PARAM_QUALIFIER, rootQualifiers, qualifier));
+  }
+
   public static void validateProjectPattern(@Nullable String projectPattern) {
     if (isNullOrEmpty(projectPattern)) {
       return;
@@ -78,7 +101,7 @@ public class PermissionRequestValidator {
     try {
       Pattern.compile(projectPattern);
     } catch (PatternSyntaxException e) {
-      throw new BadRequestException(format("The '%s' parameter must be a valid Java regular expression. '%s' was passed", PARAM_PATTERN, projectPattern));
+      throw new BadRequestException(format("The '%s' parameter must be a valid Java regular expression. '%s' was passed", PARAM_PROJECT_KEY_PATTERN, projectPattern));
     }
   }
 }

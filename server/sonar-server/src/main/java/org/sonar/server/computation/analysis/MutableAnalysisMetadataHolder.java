@@ -19,12 +19,34 @@
  */
 package org.sonar.server.computation.analysis;
 
-import java.util.Date;
+import javax.annotation.Nullable;
+import org.sonar.server.computation.snapshot.Snapshot;
 
 public interface MutableAnalysisMetadataHolder extends AnalysisMetadataHolder {
 
   /**
    * @throws IllegalStateException if the analysis date has already been set
    */
-  void setAnalysisDate(Date date);
+  MutableAnalysisMetadataHolder setAnalysisDate(long date);
+
+  /**
+   * @throws IllegalStateException if baseProjectSnapshot has already been set
+   */
+  MutableAnalysisMetadataHolder setBaseProjectSnapshot(@Nullable Snapshot baseProjectSnapshot);
+
+  /**
+   * @throws IllegalStateException if cross project duplication flag has already been set
+   */
+  MutableAnalysisMetadataHolder setCrossProjectDuplicationEnabled(boolean isCrossProjectDuplicationEnabled);
+
+  /**
+   * @throws IllegalStateException if branch has already been set
+   */
+  MutableAnalysisMetadataHolder setBranch(@Nullable String branch);
+
+  /**
+   * @throws IllegalStateException if root component ref has already been set
+   */
+  MutableAnalysisMetadataHolder setRootComponentRef(int rootComponentRef);
+
 }

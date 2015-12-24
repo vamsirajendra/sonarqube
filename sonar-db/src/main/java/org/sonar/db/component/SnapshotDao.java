@@ -26,14 +26,20 @@ import java.util.Collection;
 import java.util.List;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
+import org.apache.ibatis.session.RowBounds;
 import org.sonar.api.resources.Scopes;
 import org.sonar.db.Dao;
 import org.sonar.db.DbSession;
 import org.sonar.db.RowNotFoundException;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.FluentIterable.from;
 
 public class SnapshotDao implements Dao {
+
+  public static boolean isLast(SnapshotDto snapshotTested, @Nullable SnapshotDto previousLastSnapshot) {
+    return previousLastSnapshot == null || previousLastSnapshot.getCreatedAt() < snapshotTested.getCreatedAt();
+  }
 
   @CheckForNull
   public SnapshotDto selectById(DbSession session, long id) {
@@ -53,6 +59,10 @@ public class SnapshotDao implements Dao {
     return mapper(session).selectLastSnapshot(componentId);
   }
 
+  public boolean hasLastSnapshotByComponentUuid(DbSession session, String componentUUid) {
+    return mapper(session).countLastSnapshotByComponentUuid(componentUUid) > 0;
+  }
+
   public List<SnapshotDto> selectSnapshotsByComponentId(DbSession session, long componentId) {
     return mapper(session).selectSnapshotsByQuery(new SnapshotQuery().setComponentId(componentId));
   }
@@ -61,8 +71,24 @@ public class SnapshotDao implements Dao {
     return mapper(session).selectSnapshotsByQuery(query);
   }
 
+  @CheckForNull
+  public SnapshotDto selectSnapshotByQuery(DbSession session, SnapshotQuery query) {
+    List<SnapshotDto> snapshotDtos = mapper(session).selectSnapshotsByQuery(query);
+    if (snapshotDtos.isEmpty()) {
+      return null;
+    }
+    checkState(snapshotDtos.size() == 1, "Expected one snapshot to be returned, got %s", snapshotDtos.size());
+    return snapshotDtos.get(0);
+  }
+
   public List<SnapshotDto> selectPreviousVersionSnapshots(DbSession session, long componentId, String lastVersion) {
     return mapper(session).selectPreviousVersionSnapshots(componentId, lastVersion);
+  }
+
+  @CheckForNull
+  public SnapshotDto selectOldestSnapshot(DbSession session, long componentId) {
+    List<SnapshotDto> snapshotDtos = mapper(session).selectOldestSnapshots(componentId, new RowBounds(0, 1));
+    return snapshotDtos.isEmpty() ? null : snapshotDtos.get(0);
   }
 
   public List<SnapshotDto> selectSnapshotAndChildrenOfProjectScope(DbSession session, long snapshotId) {
@@ -85,10 +111,6 @@ public class SnapshotDao implements Dao {
     return mapper(session).updateSnapshotAndChildrenLastFlag(rootId, pathRootId, path, isLast);
   }
 
-  public static boolean isLast(SnapshotDto snapshotTested, @Nullable SnapshotDto previousLastSnapshot) {
-    return previousLastSnapshot == null || previousLastSnapshot.getCreatedAt() < snapshotTested.getCreatedAt();
-  }
-
   public SnapshotDto insert(DbSession session, SnapshotDto item) {
     mapper(session).insert(item);
     return item;
@@ -107,8 +129,8 @@ public class SnapshotDao implements Dao {
   @CheckForNull
   public ViewsSnapshotDto selectSnapshotBefore(long componentId, long date, DbSession dbSession) {
     return from(mapper(dbSession).selectSnapshotBefore(componentId, date))
-        .first()
-        .orNull();
+      .first()
+      .orNull();
   }
 
   @CheckForNull

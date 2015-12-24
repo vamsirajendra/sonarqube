@@ -3,9 +3,9 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>org.codehaus.sonar</groupId>
-    <artifactId>sonar</artifactId>
-    <version>5.2-SNAPSHOT</version>
+    <groupId>org.sonarsource.sonarqube</groupId>
+    <artifactId>sonarqube</artifactId>
+    <version>5.4-SNAPSHOT</version>
   </parent>
 
   <artifactId>sonar-application</artifactId>
@@ -21,12 +21,12 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-process</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-process-monitor</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -43,25 +43,25 @@
     </dependency>
 
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-server</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-search</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-batch-shaded</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-web</artifactId>
       <version>${project.version}</version>
       <type>war</type>
@@ -120,7 +120,7 @@
 
     <!-- unit tests -->
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-testing-harness</artifactId>
       <scope>test</scope>
     </dependency>
@@ -220,8 +220,8 @@
             <configuration>
               <rules>
                 <requireFilesSize>
-                  <minsize>84000000</minsize>
-                  <maxsize>880000000</maxsize>
+                  <minsize>100000000</minsize>
+                  <maxsize>115000000</maxsize>
                   <files>
                     <file>${project.build.directory}/sonarqube-${project.version}.zip</file>
                   </files>

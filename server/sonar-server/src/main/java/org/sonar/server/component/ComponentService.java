@@ -146,43 +146,58 @@ public class ComponentService {
 
   public ComponentDto create(NewComponent newComponent) {
     userSession.checkGlobalPermission(GlobalPermissions.PROVISIONING);
-    ComponentDto project = createProject(newComponent);
-    removeDuplicatedProjects(project.getKey());
-    return project;
-  }
 
-  private ComponentDto createProject(NewComponent newComponent) {
     DbSession session = dbClient.openSession(false);
     try {
-      checkKeyFormat(newComponent.qualifier(), newComponent.key());
-      checkBranchFormat(newComponent.qualifier(), newComponent.branch());
-      String keyWithBranch = ComponentKeys.createKey(newComponent.key(), newComponent.branch());
-
-      ComponentDto existingComponent = getNullableByKey(keyWithBranch);
-      if (existingComponent != null) {
-        throw new BadRequestException(formatMessage("Could not create %s, key already exists: %s", newComponent.qualifier(), keyWithBranch));
-      }
-
-      String uuid = Uuids.create();
-      ComponentDto component = new ComponentDto()
-        .setUuid(uuid)
-        .setModuleUuid(null)
-        .setModuleUuidPath(ComponentDto.MODULE_UUID_PATH_SEP + uuid + ComponentDto.MODULE_UUID_PATH_SEP)
-        .setProjectUuid(uuid)
-        .setKey(keyWithBranch)
-        .setDeprecatedKey(keyWithBranch)
-        .setName(newComponent.name())
-        .setLongName(newComponent.name())
-        .setScope(Scopes.PROJECT)
-        .setQualifier(newComponent.qualifier())
-        .setCreatedAt(new Date(system2.now()));
-      dbClient.componentDao().insert(session, component);
-      dbClient.componentIndexDao().indexResource(session, component.getId());
-      session.commit();
-      return component;
+      return create(session, newComponent);
     } finally {
       dbClient.closeSession(session);
     }
+  }
+
+  public ComponentDto create(DbSession session, NewComponent newComponent) {
+    userSession.checkGlobalPermission(GlobalPermissions.PROVISIONING);
+    checkKeyFormat(newComponent.qualifier(), newComponent.key());
+    ComponentDto project = createProject(session, newComponent);
+    removeDuplicatedProjects(session, project.getKey());
+    return project;
+  }
+
+  /**
+   * No permission check must be done when inserting a new developer as it's done on Compute Engine side.
+   * No check must be done on the key
+   * No need to remove duplicated components as it's not possible to create the same developer twice in the same time.
+   */
+  public ComponentDto createDeveloper(DbSession session, NewComponent newComponent) {
+    return createProject(session, newComponent);
+  }
+
+  private ComponentDto createProject(DbSession session, NewComponent newComponent) {
+    checkBranchFormat(newComponent.qualifier(), newComponent.branch());
+    String keyWithBranch = ComponentKeys.createKey(newComponent.key(), newComponent.branch());
+
+    ComponentDto existingComponent = getNullableByKey(keyWithBranch);
+    if (existingComponent != null) {
+      throw new BadRequestException(formatMessage("Could not create %s, key already exists: %s", newComponent.qualifier(), keyWithBranch));
+    }
+
+    String uuid = Uuids.create();
+    ComponentDto component = new ComponentDto()
+      .setUuid(uuid)
+      .setModuleUuid(null)
+      .setModuleUuidPath(ComponentDto.MODULE_UUID_PATH_SEP + uuid + ComponentDto.MODULE_UUID_PATH_SEP)
+      .setProjectUuid(uuid)
+      .setKey(keyWithBranch)
+      .setDeprecatedKey(keyWithBranch)
+      .setName(newComponent.name())
+      .setLongName(newComponent.name())
+      .setScope(Scopes.PROJECT)
+      .setQualifier(newComponent.qualifier())
+      .setCreatedAt(new Date(system2.now()));
+    dbClient.componentDao().insert(session, component);
+    dbClient.componentIndexDao().indexResource(session, component.getId());
+    session.commit();
+    return component;
   }
 
   /**
@@ -191,17 +206,12 @@ public class ComponentService {
    *
    * SONAR-6332
    */
-  private void removeDuplicatedProjects(String projectKey) {
-    DbSession session = dbClient.openSession(false);
-    try {
-      List<ComponentDto> duplicated = dbClient.componentDao().selectComponentsHavingSameKeyOrderedById(session, projectKey);
-      for (int i = 1; i < duplicated.size(); i++) {
-        dbClient.componentDao().delete(session, duplicated.get(i).getId());
-      }
-      session.commit();
-    } finally {
-      dbClient.closeSession(session);
+  private void removeDuplicatedProjects(DbSession session, String projectKey) {
+    List<ComponentDto> duplicated = dbClient.componentDao().selectComponentsHavingSameKeyOrderedById(session, projectKey);
+    for (int i = 1; i < duplicated.size(); i++) {
+      dbClient.componentDao().delete(session, duplicated.get(i).getId());
     }
+    session.commit();
   }
 
   public Collection<String> componentUuids(@Nullable Collection<String> componentKeys) {

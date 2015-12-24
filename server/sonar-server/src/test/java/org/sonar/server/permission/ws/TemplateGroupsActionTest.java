@@ -28,13 +28,16 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
-import org.sonar.api.server.ws.WebService;
+import org.sonar.api.resources.Qualifiers;
+import org.sonar.api.server.ws.WebService.Param;
+import org.sonar.api.server.ws.WebService.SelectionMode;
 import org.sonar.api.utils.System2;
 import org.sonar.api.web.UserRole;
 import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.db.DbTester;
+import org.sonar.db.component.ResourceTypesRule;
 import org.sonar.db.permission.PermissionTemplateDto;
 import org.sonar.db.permission.PermissionTemplateGroupDto;
 import org.sonar.db.user.GroupDto;
@@ -43,8 +46,9 @@ import org.sonar.server.exceptions.BadRequestException;
 import org.sonar.server.exceptions.ForbiddenException;
 import org.sonar.server.exceptions.NotFoundException;
 import org.sonar.server.exceptions.UnauthorizedException;
-import org.sonar.server.plugins.MimeTypes;
+import org.sonarqube.ws.MediaTypes;
 import org.sonar.server.tester.UserSessionRule;
+import org.sonar.server.usergroups.ws.UserGroupFinder;
 import org.sonar.server.ws.WsActionTester;
 import org.sonar.test.DbTests;
 import org.sonarqube.ws.WsPermissions.WsGroupsResponse;
@@ -58,9 +62,9 @@ import static org.sonar.core.permission.GlobalPermissions.SYSTEM_ADMIN;
 import static org.sonar.db.permission.PermissionTemplateTesting.newPermissionTemplateDto;
 import static org.sonar.db.permission.PermissionTemplateTesting.newPermissionTemplateGroupDto;
 import static org.sonar.db.user.GroupTesting.newGroupDto;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PERMISSION;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_TEMPLATE_UUID;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_TEMPLATE_NAME;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PERMISSION;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_ID;
 import static org.sonar.test.JsonAssert.assertJson;
 
 @Category(DbTests.class)
@@ -71,6 +75,7 @@ public class TemplateGroupsActionTest {
   public UserSessionRule userSession = UserSessionRule.standalone();
   @Rule
   public DbTester db = DbTester.create(System2.INSTANCE);
+  ResourceTypesRule resourceTypes = new ResourceTypesRule().setRootQualifiers(Qualifiers.PROJECT, Qualifiers.VIEW, "DEV");
 
   DbClient dbClient;
   DbSession dbSession;
@@ -85,7 +90,12 @@ public class TemplateGroupsActionTest {
   public void setUp() {
     dbClient = db.getDbClient();
     dbSession = db.getSession();
-    underTest = new TemplateGroupsAction(dbClient, userSession, new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient)));
+    underTest = new TemplateGroupsAction(dbClient, userSession,
+      new PermissionDependenciesFinder(
+        dbClient,
+        new ComponentFinder(dbClient),
+        new UserGroupFinder(dbClient),
+        resourceTypes));
     ws = new WsActionTester(underTest);
 
     userSession.login("login").setGlobalPermissions(SYSTEM_ADMIN);
@@ -119,7 +129,7 @@ public class TemplateGroupsActionTest {
 
     String response = ws.newRequest()
       .setParam(PARAM_PERMISSION, UserRole.ISSUE_ADMIN)
-      .setParam(PARAM_TEMPLATE_UUID, template1.getUuid())
+      .setParam(PARAM_TEMPLATE_ID, template1.getUuid())
       .execute().getInput();
 
     assertJson(response)
@@ -131,7 +141,7 @@ public class TemplateGroupsActionTest {
   @Test
   public void search_by_template_name() throws IOException {
     InputStream responseStream = ws.newRequest()
-      .setMediaType(MimeTypes.PROTOBUF)
+      .setMediaType(MediaTypes.PROTOBUF)
       .setParam(PARAM_PERMISSION, UserRole.USER)
       .setParam(PARAM_TEMPLATE_NAME, template1.getName())
       .execute()
@@ -142,9 +152,23 @@ public class TemplateGroupsActionTest {
   }
 
   @Test
+  public void search_with_admin_permission_does_not_return_anyone() throws IOException {
+    InputStream responseStream = ws.newRequest()
+      .setMediaType(MediaTypes.PROTOBUF)
+      .setParam(PARAM_PERMISSION, UserRole.ADMIN)
+      .setParam(PARAM_TEMPLATE_ID, template1.getUuid())
+      .setParam(Param.SELECTED, SelectionMode.ALL.value())
+      .execute()
+      .getInputStream();
+    WsGroupsResponse response = WsGroupsResponse.parseFrom(responseStream);
+
+    assertThat(response.getGroupsList()).extracting("name").containsExactly("group-1-name", "group-2-name", "group-3-name");
+  }
+
+  @Test
   public void search_with_pagination() throws IOException {
     InputStream responseStream = ws.newRequest()
-      .setMediaType(MimeTypes.PROTOBUF)
+      .setMediaType(MediaTypes.PROTOBUF)
       .setParam(PARAM_PERMISSION, UserRole.USER)
       .setParam(PARAM_TEMPLATE_NAME, template1.getName())
       .setParam(PAGE, "2")
@@ -159,10 +183,10 @@ public class TemplateGroupsActionTest {
   @Test
   public void search_with_selected() throws IOException {
     InputStream responseStream = ws.newRequest()
-      .setMediaType(MimeTypes.PROTOBUF)
+      .setMediaType(MediaTypes.PROTOBUF)
       .setParam(PARAM_PERMISSION, UserRole.USER)
       .setParam(PARAM_TEMPLATE_NAME, template1.getName())
-      .setParam(SELECTED, WebService.SelectionMode.ALL.value())
+      .setParam(SELECTED, SelectionMode.ALL.value())
       .execute()
       .getInputStream();
     WsGroupsResponse response = WsGroupsResponse.parseFrom(responseStream);
@@ -173,7 +197,7 @@ public class TemplateGroupsActionTest {
   @Test
   public void search_with_text_query() throws IOException {
     InputStream responseStream = ws.newRequest()
-      .setMediaType(MimeTypes.PROTOBUF)
+      .setMediaType(MediaTypes.PROTOBUF)
       .setParam(PARAM_PERMISSION, UserRole.USER)
       .setParam(PARAM_TEMPLATE_NAME, template1.getName())
       .setParam(TEXT_QUERY, "-name")
@@ -191,7 +215,7 @@ public class TemplateGroupsActionTest {
 
     ws.newRequest()
       .setParam(PARAM_PERMISSION, UserRole.USER)
-      .setParam(PARAM_TEMPLATE_UUID, template1.getUuid())
+      .setParam(PARAM_TEMPLATE_ID, template1.getUuid())
       .execute();
   }
 
@@ -202,7 +226,7 @@ public class TemplateGroupsActionTest {
 
     ws.newRequest()
       .setParam(PARAM_PERMISSION, UserRole.USER)
-      .setParam(PARAM_TEMPLATE_UUID, template1.getUuid())
+      .setParam(PARAM_TEMPLATE_ID, template1.getUuid())
       .execute();
   }
 
@@ -212,7 +236,7 @@ public class TemplateGroupsActionTest {
 
     ws.newRequest()
       .setParam(PARAM_PERMISSION, UserRole.USER)
-      .setParam(PARAM_TEMPLATE_UUID, template1.getUuid())
+      .setParam(PARAM_TEMPLATE_ID, template1.getUuid())
       .setParam(PARAM_TEMPLATE_NAME, template1.getName())
       .execute();
   }
@@ -232,7 +256,7 @@ public class TemplateGroupsActionTest {
 
     ws.newRequest()
       .setParam(PARAM_PERMISSION, UserRole.USER)
-      .setParam(PARAM_TEMPLATE_UUID, "unknown-uuid")
+      .setParam(PARAM_TEMPLATE_ID, "unknown-uuid")
       .execute();
   }
 
@@ -242,7 +266,7 @@ public class TemplateGroupsActionTest {
 
     ws.newRequest()
       .setParam(PARAM_PERMISSION, GlobalPermissions.DASHBOARD_SHARING)
-      .setParam(PARAM_TEMPLATE_UUID, template1.getUuid())
+      .setParam(PARAM_TEMPLATE_ID, template1.getUuid())
       .execute();
   }
 

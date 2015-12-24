@@ -1,11 +1,11 @@
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/api-documentation-web-service.hbs';
 
 export default Marionette.ItemView.extend({
   tagName: 'a',
   className: 'list-group-item',
-  template: Templates['api-documentation-web-service'],
+  template: Template,
 
   modelEvents: {
     'change': 'render'
@@ -25,7 +25,7 @@ export default Marionette.ItemView.extend({
     var match = this.options.state.match(this.model.get('path')) ||
         _.some(this.model.get('actions'), function (action) {
           var test = action.path + '/' + action.key;
-          return that.options.state.match(test);
+          return that.options.state.match(test, action.internal);
         });
 
     var showInternal = this.options.state.get('internal'),
@@ -37,6 +37,7 @@ export default Marionette.ItemView.extend({
     this.$el.attr('data-path', this.model.get('path'));
     this.$el.toggleClass('active', this.options.highlighted);
     this.toggleHidden();
+    this.$('[data-toggle="tooltip"]').tooltip({ container: 'body', placement: 'right' });
   },
 
   onClick: function (e) {
@@ -48,5 +49,3 @@ export default Marionette.ItemView.extend({
     this.$el.toggleClass('hidden', this.shouldBeHidden());
   }
 });
-
-

@@ -11,11 +11,12 @@ import CustomRulesView from './rule/custom-rules-view';
 import ManualRuleCreationView from './rule/manual-rule-creation-view';
 import CustomRuleCreationView from './rule/custom-rule-creation-view';
 import IssuesView from './rule/rule-issues-view';
-import './templates';
+import Template from './templates/coding-rules-rule-details.hbs';
+import confirmDialog from './confirm-dialog';
 
 export default Marionette.LayoutView.extend({
   className: 'coding-rule-details',
-  template: Templates['coding-rules-rule-details'],
+  template: Template,
 
   regions: {
     metaRegion: '.js-rule-meta',
@@ -128,9 +129,9 @@ export default Marionette.LayoutView.extend({
   deleteRule: function () {
     var that = this,
         ruleType = this.model.has('templateKey') ? 'custom' : 'manual';
-    window.confirmDialog({
-      title: t('delete'),
-      html: tp('coding_rules.delete.' + ruleType + '.confirm', this.model.get('name')),
+    confirmDialog({
+      title: window.t('delete'),
+      html: window.tp('coding_rules.delete.' + ruleType + '.confirm', this.model.get('name')),
       yesHandler: function () {
         var url = baseUrl + '/api/rules/delete',
             options = { key: that.model.id };

@@ -22,9 +22,11 @@ package org.sonar.server.permission.ws;
 
 import com.google.common.base.Optional;
 import org.sonar.api.i18n.I18n;
+import org.sonar.api.resources.ResourceTypes;
 import org.sonar.api.server.ws.Request;
 import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.WebService;
+import org.sonar.api.server.ws.WebService.Param;
 import org.sonar.api.utils.Paging;
 import org.sonar.core.permission.ProjectPermissions;
 import org.sonar.db.DbClient;
@@ -33,14 +35,22 @@ import org.sonar.db.component.ComponentDto;
 import org.sonar.server.user.UserSession;
 import org.sonarqube.ws.Common;
 import org.sonarqube.ws.WsPermissions.Permission;
-import org.sonarqube.ws.WsPermissions.WsSearchProjectPermissionsResponse;
-import org.sonarqube.ws.WsPermissions.WsSearchProjectPermissionsResponse.Project;
+import org.sonarqube.ws.WsPermissions.SearchProjectPermissionsWsResponse;
+import org.sonarqube.ws.WsPermissions.SearchProjectPermissionsWsResponse.Project;
+import org.sonarqube.ws.client.permission.SearchProjectPermissionsWsRequest;
 
 import static org.sonar.server.permission.PermissionPrivilegeChecker.checkGlobalAdminUser;
 import static org.sonar.server.permission.PermissionPrivilegeChecker.checkProjectAdminUserByComponentKey;
 import static org.sonar.server.permission.PermissionPrivilegeChecker.checkProjectAdminUserByComponentUuid;
-import static org.sonar.server.permission.ws.WsPermissionParameters.createProjectParameter;
+import static org.sonar.server.permission.ws.PermissionRequestValidator.validateQualifier;
+import static org.sonar.server.permission.ws.PermissionsWsParametersBuilder.createProjectParameter;
+import static org.sonar.server.permission.ws.WsProjectRef.newOptionalWsProjectRef;
+import static org.sonar.server.ws.WsParameterBuilder.QualifierParameterContext.newQualifierParameterContext;
+import static org.sonar.server.ws.WsParameterBuilder.createRootQualifierParameter;
 import static org.sonar.server.ws.WsUtils.writeProtobuf;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PROJECT_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PROJECT_KEY;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_QUALIFIER;
 
 public class SearchProjectPermissionsAction implements PermissionsWsAction {
   private static final String PROPERTY_PREFIX = "projects_role.";
@@ -49,12 +59,14 @@ public class SearchProjectPermissionsAction implements PermissionsWsAction {
   private final DbClient dbClient;
   private final UserSession userSession;
   private final I18n i18n;
+  private final ResourceTypes resourceTypes;
   private final SearchProjectPermissionsDataLoader dataLoader;
 
-  public SearchProjectPermissionsAction(DbClient dbClient, UserSession userSession, I18n i18n, SearchProjectPermissionsDataLoader dataLoader) {
+  public SearchProjectPermissionsAction(DbClient dbClient, UserSession userSession, I18n i18n, ResourceTypes resourceTypes, SearchProjectPermissionsDataLoader dataLoader) {
     this.dbClient = dbClient;
     this.userSession = userSession;
     this.i18n = i18n;
+    this.resourceTypes = resourceTypes;
     this.dataLoader = dataLoader;
   }
 
@@ -70,24 +82,40 @@ public class SearchProjectPermissionsAction implements PermissionsWsAction {
       .setHandler(this);
 
     createProjectParameter(action);
+    createRootQualifierParameter(action, newQualifierParameterContext(userSession, i18n, resourceTypes))
+      .setSince("5.3");
   }
 
   @Override
   public void handle(Request wsRequest, Response wsResponse) throws Exception {
-    checkRequestAndPermissions(wsRequest);
+    SearchProjectPermissionsWsResponse searchProjectPermissionsWsResponse = doHandle(toSearchProjectPermissionsWsRequest(wsRequest));
+    writeProtobuf(searchProjectPermissionsWsResponse, wsRequest, wsResponse);
+  }
 
+  private SearchProjectPermissionsWsResponse doHandle(SearchProjectPermissionsWsRequest request) {
+    checkRequestAndPermissions(request);
     DbSession dbSession = dbClient.openSession(false);
     try {
-      SearchProjectPermissionsData data = dataLoader.load(wsRequest);
-      WsSearchProjectPermissionsResponse response = buildResponse(data);
-      writeProtobuf(response, wsRequest, wsResponse);
+      validateQualifier(request.getQualifier(), resourceTypes);
+      SearchProjectPermissionsData data = dataLoader.load(request);
+      return buildResponse(data);
     } finally {
       dbClient.closeSession(dbSession);
     }
   }
 
-  private void checkRequestAndPermissions(Request wsRequest) {
-    Optional<WsProjectRef> project = WsProjectRef.optionalFromRequest(wsRequest);
+  private static SearchProjectPermissionsWsRequest toSearchProjectPermissionsWsRequest(Request request) {
+    return new SearchProjectPermissionsWsRequest()
+      .setProjectId(request.param(PARAM_PROJECT_ID))
+      .setProjectKey(request.param(PARAM_PROJECT_KEY))
+      .setQualifier(request.param(PARAM_QUALIFIER))
+      .setPage(request.mandatoryParamAsInt(Param.PAGE))
+      .setPageSize(request.mandatoryParamAsInt(Param.PAGE_SIZE))
+      .setQuery(request.param(Param.TEXT_QUERY));
+  }
+
+  private void checkRequestAndPermissions(SearchProjectPermissionsWsRequest request) {
+    Optional<WsProjectRef> project = newOptionalWsProjectRef(request.getProjectId(), request.getProjectKey());
     boolean hasProject = project.isPresent();
     boolean hasProjectUuid = hasProject && project.get().uuid() != null;
     boolean hasProjectKey = hasProject && project.get().key() != null;
@@ -101,8 +129,8 @@ public class SearchProjectPermissionsAction implements PermissionsWsAction {
     }
   }
 
-  private WsSearchProjectPermissionsResponse buildResponse(SearchProjectPermissionsData data) {
-    WsSearchProjectPermissionsResponse.Builder response = WsSearchProjectPermissionsResponse.newBuilder();
+  private SearchProjectPermissionsWsResponse buildResponse(SearchProjectPermissionsData data) {
+    SearchProjectPermissionsWsResponse.Builder response = SearchProjectPermissionsWsResponse.newBuilder();
     Permission.Builder permissionResponse = Permission.newBuilder();
 
     Project.Builder rootComponentBuilder = Project.newBuilder();
@@ -111,6 +139,7 @@ public class SearchProjectPermissionsAction implements PermissionsWsAction {
         .clear()
         .setId(rootComponent.uuid())
         .setKey(rootComponent.key())
+        .setQualifier(rootComponent.qualifier())
         .setName(rootComponent.name());
       for (String permission : data.permissions(rootComponent.getId())) {
         rootComponentBuilder.addPermissions(
@@ -129,8 +158,7 @@ public class SearchProjectPermissionsAction implements PermissionsWsAction {
           .clear()
           .setKey(permissionKey)
           .setName(i18nName(permissionKey))
-          .setDescription(i18nDescriptionMessage(permissionKey))
-        );
+          .setDescription(i18nDescriptionMessage(permissionKey)));
     }
 
     Paging paging = data.paging();
@@ -138,8 +166,7 @@ public class SearchProjectPermissionsAction implements PermissionsWsAction {
       Common.Paging.newBuilder()
         .setPageIndex(paging.pageIndex())
         .setPageSize(paging.pageSize())
-        .setTotal(paging.total())
-      );
+        .setTotal(paging.total()));
 
     return response.build();
   }

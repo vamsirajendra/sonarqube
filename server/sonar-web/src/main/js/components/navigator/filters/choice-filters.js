@@ -2,11 +2,12 @@ import $ from 'jquery';
 import _ from 'underscore';
 import Backbone from 'backbone';
 import BaseFilters from './base-filters';
-import '../templates';
+import Template from '../templates/choice-filter.hbs';
+import ItemTemplate from '../templates/choice-filter-item.hbs';
 
 var DetailsChoiceFilterView = BaseFilters.DetailsFilterView.extend({
-  template: Templates['choice-filter'],
-  itemTemplate: Templates['choice-filter-item'],
+  template: Template,
+  itemTemplate: ItemTemplate,
 
 
   events: function () {
@@ -249,7 +250,7 @@ var ChoiceFilterView = BaseFilters.BaseFilterView.extend({
         }),
         defaultValue = this.model.has('defaultValue') ?
             this.model.get('defaultValue') :
-            this.model.get('multiple') ? t('all') : t('any');
+            this.model.get('multiple') ? window.t('all') : window.t('any');
 
     return this.isDefaultValue() ? defaultValue : value.join(', ');
   },
@@ -386,5 +387,3 @@ export default {
   DetailsChoiceFilterView: DetailsChoiceFilterView,
   ChoiceFilterView: ChoiceFilterView
 };
-
-

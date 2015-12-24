@@ -26,12 +26,14 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentCaptor;
+import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.utils.System2;
 import org.sonar.api.web.UserRole;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbTester;
 import org.sonar.db.component.ComponentDto;
 import org.sonar.db.component.ComponentTesting;
+import org.sonar.db.component.ResourceTypesRule;
 import org.sonar.db.user.GroupDto;
 import org.sonar.server.component.ComponentFinder;
 import org.sonar.server.exceptions.BadRequestException;
@@ -40,6 +42,7 @@ import org.sonar.server.exceptions.ServerException;
 import org.sonar.server.permission.PermissionChange;
 import org.sonar.server.permission.PermissionUpdater;
 import org.sonar.server.tester.UserSessionRule;
+import org.sonar.server.usergroups.ws.UserGroupFinder;
 import org.sonar.server.ws.WsTester;
 import org.sonar.test.DbTests;
 
@@ -48,13 +51,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.sonar.core.permission.GlobalPermissions.SYSTEM_ADMIN;
 import static org.sonar.db.component.ComponentTesting.newProjectDto;
+import static org.sonar.db.component.ComponentTesting.newView;
 import static org.sonar.server.permission.ws.AddGroupAction.ACTION;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_GROUP_ID;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_GROUP_NAME;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PERMISSION;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PROJECT_KEY;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PROJECT_ID;
-import static org.sonar.server.permission.ws.PermissionsWs.ENDPOINT;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.CONTROLLER;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_GROUP_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_GROUP_NAME;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PERMISSION;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PROJECT_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PROJECT_KEY;
 
 @Category(DbTests.class)
 public class AddGroupActionTest {
@@ -64,6 +68,7 @@ public class AddGroupActionTest {
   public DbTester db = DbTester.create(System2.INSTANCE);
   @Rule
   public ExpectedException expectedException = ExpectedException.none();
+  ResourceTypesRule resourceTypes = new ResourceTypesRule().setRootQualifiers(Qualifiers.PROJECT, Qualifiers.VIEW, "DEV");
   private PermissionUpdater permissionUpdater;
   private DbClient dbClient;
   private ArgumentCaptor<PermissionChange> permissionChangeCaptor;
@@ -75,7 +80,12 @@ public class AddGroupActionTest {
     dbClient = db.getDbClient();
     ComponentFinder componentFinder = new ComponentFinder(dbClient);
     ws = new WsTester(new PermissionsWs(
-      new AddGroupAction(dbClient, new PermissionChangeBuilder(new PermissionDependenciesFinder(dbClient, componentFinder)), permissionUpdater)));
+      new AddGroupAction(dbClient, new PermissionChangeBuilder(new PermissionDependenciesFinder(
+        dbClient,
+        componentFinder,
+        new UserGroupFinder(dbClient),
+        resourceTypes)),
+        permissionUpdater)));
     userSession.login("admin").setGlobalPermissions(SYSTEM_ADMIN);
   }
 
@@ -147,6 +157,24 @@ public class AddGroupActionTest {
   }
 
   @Test
+  public void add_with_view_uuid() throws Exception {
+    insertGroup("sonar-administrators");
+    insertComponent(newView("view-uuid").setKey("view-key"));
+    commit();
+
+    newRequest()
+      .setParam(PARAM_GROUP_NAME, "sonar-administrators")
+      .setParam(PARAM_PROJECT_ID, "view-uuid")
+      .setParam(PARAM_PERMISSION, SYSTEM_ADMIN)
+      .execute();
+
+    verify(permissionUpdater).addPermission(permissionChangeCaptor.capture());
+    PermissionChange permissionChange = permissionChangeCaptor.getValue();
+    assertThat(permissionChange.componentKey()).isEqualTo("view-key");
+    assertThat(permissionChange.groupName()).isEqualTo("sonar-administrators");
+  }
+
+  @Test
   public void fail_if_project_uuid_not_found() throws Exception {
     expectedException.expect(NotFoundException.class);
 
@@ -162,7 +190,7 @@ public class AddGroupActionTest {
   }
 
   @Test
-  public void fail_if_project_permission_withou_project() throws Exception {
+  public void fail_if_project_permission_without_project() throws Exception {
     expectedException.expect(BadRequestException.class);
 
     insertGroup("sonar-administrators");
@@ -195,7 +223,7 @@ public class AddGroupActionTest {
   public void fail_when_get_request() throws Exception {
     expectedException.expect(ServerException.class);
 
-    ws.newGetRequest(ENDPOINT, ACTION)
+    ws.newGetRequest(CONTROLLER, ACTION)
       .setParam(PARAM_GROUP_NAME, "sonar-administrators")
       .setParam(PARAM_PERMISSION, SYSTEM_ADMIN)
       .execute();
@@ -236,7 +264,7 @@ public class AddGroupActionTest {
   }
 
   private WsTester.TestRequest newRequest() {
-    return ws.newPostRequest(ENDPOINT, ACTION);
+    return ws.newPostRequest(CONTROLLER, ACTION);
   }
 
   private void commit() {

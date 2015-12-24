@@ -19,6 +19,8 @@
  */
 package org.sonar.batch.repository.language;
 
+import org.picocontainer.Startable;
+
 import org.sonar.api.resources.Languages;
 
 import javax.annotation.CheckForNull;
@@ -30,12 +32,19 @@ import java.util.Collection;
  * Languages repository using {@link Languages}
  * @since 4.4
  */
-public class DefaultLanguagesRepository implements LanguagesRepository {
+public class DefaultLanguagesRepository implements LanguagesRepository, Startable {
 
   private Languages languages;
 
   public DefaultLanguagesRepository(Languages languages) {
     this.languages = languages;
+  }
+
+  @Override
+  public void start() {
+    if (languages.all().length == 0) {
+      throw new IllegalStateException("No language plugins are installed.");
+    }
   }
 
   /**
@@ -59,6 +68,11 @@ public class DefaultLanguagesRepository implements LanguagesRepository {
       result.add(new Language(language.getKey(), language.getName(), language.getFileSuffixes()));
     }
     return result;
+  }
+
+  @Override
+  public void stop() {
+    // nothing to do
   }
 
 }

@@ -19,11 +19,45 @@
  */
 package org.sonar.server.computation.analysis;
 
-import java.util.Date;
+import javax.annotation.CheckForNull;
+import org.sonar.server.computation.snapshot.Snapshot;
 
 public interface AnalysisMetadataHolder {
   /**
    * @throws IllegalStateException if no analysis date has been set
    */
-  Date getAnalysisDate();
+  long getAnalysisDate();
+
+  /**
+   * Convenience method equivalent to calling {@link #getBaseProjectSnapshot() == null}
+   *
+   * @throws IllegalStateException if baseProjectSnapshot has not been set
+   */
+  boolean isFirstAnalysis();
+
+  /**
+   * Return the last snapshot of the project.
+   * If it's the first analysis, it will return null.
+   *
+   * @throws IllegalStateException if baseProjectSnapshot has not been set
+   */
+  @CheckForNull
+  Snapshot getBaseProjectSnapshot();
+
+  /**
+   * @throws IllegalStateException if cross project duplication flag has not been set
+   */
+  boolean isCrossProjectDuplicationEnabled();
+
+  /**
+   * @throws IllegalStateException if branch has not been set
+   */
+  @CheckForNull
+  String getBranch();
+
+  /**
+   * @throws IllegalStateException if root component ref has not been set
+   */
+  int getRootComponentRef();
+
 }

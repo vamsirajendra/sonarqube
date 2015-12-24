@@ -20,27 +20,30 @@
 
 package org.sonar.server.computation.source;
 
+import com.google.common.collect.ImmutableList;
+import java.util.List;
 import org.junit.Test;
-import org.sonar.batch.protocol.output.BatchReport;
 import org.sonar.db.protobuf.DbFileSources;
+import org.sonar.server.computation.scm.Changeset;
+import org.sonar.server.computation.scm.ScmInfo;
+import org.sonar.server.computation.scm.ScmInfoImpl;
 
+import static com.google.common.collect.Lists.newArrayList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.failBecauseExceptionWasNotThrown;
 
 public class ScmLineReaderTest {
 
   @Test
   public void set_scm() {
-    BatchReport.Changesets scmReport = BatchReport.Changesets.newBuilder()
-      .addChangeset(BatchReport.Changesets.Changeset.newBuilder()
+    ScmInfo scmInfo = new ScmInfoImpl(newArrayList(
+      Changeset.newChangesetBuilder()
         .setAuthor("john")
         .setDate(123456789L)
         .setRevision("rev-1")
-        .build())
-      .addChangesetIndexByLine(0)
-      .build();
+        .build()
+      ));
 
-    ScmLineReader lineScm = new ScmLineReader(scmReport);
+    ScmLineReader lineScm = new ScmLineReader(scmInfo);
 
     DbFileSources.Line.Builder lineBuilder = DbFileSources.Data.newBuilder().addLinesBuilder().setLine(1);
     lineScm.read(lineBuilder);
@@ -51,79 +54,64 @@ public class ScmLineReaderTest {
   }
 
   @Test
-  public void set_only_author() {
-    BatchReport.Changesets scmReport = BatchReport.Changesets.newBuilder()
-      .addChangeset(BatchReport.Changesets.Changeset.newBuilder()
-        .setAuthor("john")
-        .build())
-      .addChangesetIndexByLine(0)
-      .build();
-
-    ScmLineReader lineScm = new ScmLineReader(scmReport);
-
-    DbFileSources.Line.Builder lineBuilder = DbFileSources.Data.newBuilder().addLinesBuilder().setLine(1);
-    lineScm.read(lineBuilder);
-
-    assertThat(lineBuilder.getScmAuthor()).isEqualTo("john");
-    assertThat(lineBuilder.hasScmDate()).isFalse();
-    assertThat(lineBuilder.hasScmRevision()).isFalse();
-  }
-
-  @Test
-  public void set_only_date() {
-    BatchReport.Changesets scmReport = BatchReport.Changesets.newBuilder()
-      .addChangeset(BatchReport.Changesets.Changeset.newBuilder()
+  public void set_scm_with_minim_fields() {
+    ScmInfo scmInfo = new ScmInfoImpl(newArrayList(
+      Changeset.newChangesetBuilder()
         .setDate(123456789L)
-        .build())
-      .addChangesetIndexByLine(0)
-      .build();
+        .setRevision("rev-1")
+        .build()
+      ));
 
-    ScmLineReader lineScm = new ScmLineReader(scmReport);
+    ScmLineReader lineScm = new ScmLineReader(scmInfo);
 
     DbFileSources.Line.Builder lineBuilder = DbFileSources.Data.newBuilder().addLinesBuilder().setLine(1);
     lineScm.read(lineBuilder);
 
     assertThat(lineBuilder.hasScmAuthor()).isFalse();
     assertThat(lineBuilder.getScmDate()).isEqualTo(123456789L);
-    assertThat(lineBuilder.hasScmRevision()).isFalse();
-  }
-
-  @Test
-  public void set_only_revision() {
-    BatchReport.Changesets scmReport = BatchReport.Changesets.newBuilder()
-      .addChangeset(BatchReport.Changesets.Changeset.newBuilder()
-        .setRevision("rev-1")
-        .build())
-      .addChangesetIndexByLine(0)
-      .build();
-
-    ScmLineReader lineScm = new ScmLineReader(scmReport);
-
-    DbFileSources.Line.Builder lineBuilder = DbFileSources.Data.newBuilder().addLinesBuilder().setLine(1);
-    lineScm.read(lineBuilder);
-
-    assertThat(lineBuilder.hasScmAuthor()).isFalse();
-    assertThat(lineBuilder.hasScmDate()).isFalse();
     assertThat(lineBuilder.getScmRevision()).isEqualTo("rev-1");
   }
 
   @Test
-  public void fail_when_changeset_is_empty() {
-    BatchReport.Changesets scmReport = BatchReport.Changesets.newBuilder()
-      .addChangeset(BatchReport.Changesets.Changeset.newBuilder()
-        .build())
-      .addChangesetIndexByLine(0)
-      .build();
+  public void getLatestChange_returns_changeset_with_highest_date_of_read_lines() {
+    long refDate = 123456789L;
+    Changeset changeset0 = Changeset.newChangesetBuilder().setDate(refDate - 636).setRevision("rev-1").build();
+    Changeset changeset1 = Changeset.newChangesetBuilder().setDate(refDate + 1).setRevision("rev-2").build();
+    Changeset changeset2 = Changeset.newChangesetBuilder().setDate(refDate + 2).setRevision("rev-3").build();
+    ScmInfo scmInfo = new ScmInfoImpl(setup8LinesChangeset(changeset0, changeset1, changeset2));
 
-    ScmLineReader lineScm = new ScmLineReader(scmReport);
+    ScmLineReader lineScm = new ScmLineReader(scmInfo);
 
-    DbFileSources.Line.Builder lineBuilder = DbFileSources.Data.newBuilder().addLinesBuilder().setLine(1);
-    try {
-      lineScm.read(lineBuilder);
-      failBecauseExceptionWasNotThrown(IllegalArgumentException.class);
-    } catch (IllegalArgumentException e) {
-      assertThat(e).hasMessage("A changeset must contains at least one of : author, revision or date");
-    }
+    // before any line is read, the latest change is null
+    assertThat(lineScm.getLatestChange()).isNull();
+
+    // read line 1, only one changeset => 0
+    readLineAndAssertLatestChangeDate(lineScm, 1, changeset0);
+
+    // read line 2, latest changeset is 1
+    readLineAndAssertLatestChangeDate(lineScm, 2, changeset1);
+
+    // read line 3, latest changeset is still 1
+    readLineAndAssertLatestChangeDate(lineScm, 3, changeset1);
+
+    // read line 4, latest changeset is now 2
+    readLineAndAssertLatestChangeDate(lineScm, 4, changeset2);
+
+    // read line 5 to 8, there will never be any changeset more recent than 2
+    readLineAndAssertLatestChangeDate(lineScm, 5, changeset2);
+    readLineAndAssertLatestChangeDate(lineScm, 6, changeset2);
+    readLineAndAssertLatestChangeDate(lineScm, 7, changeset2);
+    readLineAndAssertLatestChangeDate(lineScm, 8, changeset2);
+  }
+
+  private static List<Changeset> setup8LinesChangeset(Changeset changeset0, Changeset changeset1, Changeset changeset2) {
+    return ImmutableList.of(changeset0, changeset1, changeset1, changeset2, changeset0, changeset1, changeset0, changeset0);
+  }
+
+  private void readLineAndAssertLatestChangeDate(ScmLineReader lineScm, int line, Changeset expectedChangeset) {
+    DbFileSources.Line.Builder lineBuilder = DbFileSources.Data.newBuilder().addLinesBuilder().setLine(line);
+    lineScm.read(lineBuilder);
+    assertThat(lineScm.getLatestChange()).isSameAs(expectedChangeset);
   }
 
 }

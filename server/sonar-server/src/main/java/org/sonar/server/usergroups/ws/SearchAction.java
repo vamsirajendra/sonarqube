@@ -34,11 +34,12 @@ import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.WebService.NewController;
 import org.sonar.api.server.ws.WebService.Param;
 import org.sonar.api.utils.text.JsonWriter;
+import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
-import org.sonar.db.MyBatis;
 import org.sonar.db.user.GroupDto;
-import org.sonar.server.db.DbClient;
 import org.sonar.server.es.SearchOptions;
+
+import static org.sonar.server.es.SearchOptions.MAX_LIMIT;
 
 public class SearchAction implements UserGroupsWsAction {
 
@@ -62,7 +63,7 @@ public class SearchAction implements UserGroupsWsAction {
       .setResponseExample(getClass().getResource("example-search.json"))
       .setSince("5.2")
       .addFieldsParam(ALL_FIELDS)
-      .addPagingParams(100)
+      .addPagingParams(100, MAX_LIMIT)
       .addSearchQuery("sonar-users", "names");
   }
 
@@ -93,7 +94,7 @@ public class SearchAction implements UserGroupsWsAction {
       writeGroups(json, groups, userCountByGroup, fields);
       json.endObject().close();
     } finally {
-      MyBatis.closeQuietly(dbSession);
+      dbClient.closeSession(dbSession);
     }
   }
 

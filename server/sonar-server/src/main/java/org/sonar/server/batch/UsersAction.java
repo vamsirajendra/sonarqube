@@ -29,7 +29,7 @@ import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.WebService;
 import org.sonar.batch.protocol.input.BatchInput;
 import org.sonar.core.permission.GlobalPermissions;
-import org.sonar.server.plugins.MimeTypes;
+import org.sonarqube.ws.MediaTypes;
 import org.sonar.server.user.UserSession;
 import org.sonar.server.user.index.UserDoc;
 import org.sonar.server.user.index.UserIndex;
@@ -51,6 +51,7 @@ public class UsersAction implements BatchWsAction {
     WebService.NewAction action = controller.createAction("users")
       .setDescription("Return user details.")
       .setSince("5.2")
+      .setResponseExample(getClass().getResource("users-example.proto"))
       .setInternal(true)
       .setHandler(this);
 
@@ -66,7 +67,7 @@ public class UsersAction implements BatchWsAction {
     userSession.checkGlobalPermission(GlobalPermissions.PREVIEW_EXECUTION);
     List<String> logins = request.mandatoryParamAsStrings(PARAM_LOGINS);
 
-    response.stream().setMediaType(MimeTypes.PROTOBUF);
+    response.stream().setMediaType(MediaTypes.PROTOBUF);
     BatchInput.User.Builder userBuilder = BatchInput.User.newBuilder();
     OutputStream output = response.stream().output();
     try {
@@ -78,8 +79,10 @@ public class UsersAction implements BatchWsAction {
     }
   }
 
-  private void handleUser(UserDoc user, BatchInput.User.Builder userBuilder, OutputStream out) {
-    userBuilder.setLogin(user.login())
+  private static void handleUser(UserDoc user, BatchInput.User.Builder userBuilder, OutputStream out) {
+    userBuilder
+      .clear()
+      .setLogin(user.login())
       .setName(user.name());
     try {
       userBuilder.build().writeDelimitedTo(out);

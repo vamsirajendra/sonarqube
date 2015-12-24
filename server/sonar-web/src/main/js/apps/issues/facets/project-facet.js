@@ -6,7 +6,7 @@ export default CustomValuesFacet.extend({
   getUrl: function () {
     var q = this.options.app.state.get('contextComponentQualifier');
     if (q === 'VW' || q === 'SVW') {
-      return baseUrl + '/api/components/search';
+      return baseUrl + '/api/components/search_view_components';
     } else {
       return baseUrl + '/api/resources/search?f=s2&q=TRK&display_uuid=true';
     }
@@ -22,26 +22,26 @@ export default CustomValuesFacet.extend({
   },
 
   prepareSearchForViews: function () {
-    var componentUuid = this.options.app.state.get('contextComponentUuid');
+    var componentId = this.options.app.state.get('contextComponentUuid');
     return this.$('.js-custom-value').select2({
       placeholder: 'Search...',
       minimumInputLength: 2,
       allowClear: false,
       formatNoMatches: function () {
-        return t('select2.noMatches');
+        return window.t('select2.noMatches');
       },
       formatSearching: function () {
-        return t('select2.searching');
+        return window.t('select2.searching');
       },
       formatInputTooShort: function () {
-        return tp('select2.tooShort', 2);
+        return window.tp('select2.tooShort', 2);
       },
       width: '100%',
       ajax: {
         quietMillis: 300,
         url: this.getUrl(),
         data: function (term, page) {
-          return { q: term, componentUuid: componentUuid, p: page, ps: 25 };
+          return { q: term, componentId: componentId, p: page, ps: 25 };
         },
         results: function (data) {
           return {
@@ -78,5 +78,3 @@ export default CustomValuesFacet.extend({
     });
   }
 });
-
-

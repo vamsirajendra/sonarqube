@@ -126,10 +126,13 @@ import org.sonar.db.user.UserGroupDto;
 import org.sonar.db.user.UserGroupMapper;
 import org.sonar.db.user.UserMapper;
 import org.sonar.db.user.UserRoleDto;
+import org.sonar.db.user.UserTokenDto;
+import org.sonar.db.user.UserTokenMapper;
 import org.sonar.db.version.SchemaMigrationDto;
 import org.sonar.db.version.SchemaMigrationMapper;
 import org.sonar.db.version.v45.Migration45Mapper;
 import org.sonar.db.version.v50.Migration50Mapper;
+import org.sonar.db.version.v53.Migration53Mapper;
 
 public class MyBatis {
 
@@ -211,6 +214,7 @@ public class MyBatis {
     confBuilder.loadAlias("Event", EventDto.class);
     confBuilder.loadAlias("CustomMeasure", CustomMeasureDto.class);
     confBuilder.loadAlias("ViewsSnapshot", ViewsSnapshotDto.class);
+    confBuilder.loadAlias("UserToken", UserTokenDto.class);
 
     // AuthorizationMapper has to be loaded before IssueMapper because this last one used it
     confBuilder.loadMapper("org.sonar.db.user.AuthorizationMapper");
@@ -224,15 +228,15 @@ public class MyBatis {
       IsAliveMapper.class,
       LoadedTemplateMapper.class, MeasureFilterMapper.class, PermissionTemplateMapper.class, PropertiesMapper.class, PurgeMapper.class,
       ResourceKeyUpdaterMapper.class, ResourceIndexMapper.class, RoleMapper.class, RuleMapper.class,
-      SchemaMigrationMapper.class, UserMapper.class, GroupMapper.class, UserGroupMapper.class, WidgetMapper.class, WidgetPropertyMapper.class,
-      FileSourceMapper.class, ActionPlanMapper.class,
-      ActionPlanStatsMapper.class,
+      SchemaMigrationMapper.class, WidgetMapper.class, WidgetPropertyMapper.class,
+      UserMapper.class, GroupMapper.class, UserGroupMapper.class, UserTokenMapper.class,
+      FileSourceMapper.class, ActionPlanMapper.class, ActionPlanStatsMapper.class,
       NotificationQueueMapper.class, CharacteristicMapper.class,
       GroupMembershipMapper.class, QualityProfileMapper.class, ActiveRuleMapper.class,
       MeasureMapper.class, MetricMapper.class, CustomMeasureMapper.class, QualityGateMapper.class, QualityGateConditionMapper.class, ComponentMapper.class, SnapshotMapper.class,
       ProjectQgateAssociationMapper.class, EventMapper.class,
       CeQueueMapper.class, CeActivityMapper.class, ComponentLinkMapper.class,
-      Migration45Mapper.class, Migration50Mapper.class
+      Migration45Mapper.class, Migration50Mapper.class, Migration53Mapper.class
     };
     confBuilder.loadMappers(mappers);
 

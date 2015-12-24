@@ -19,8 +19,9 @@
  */
 package org.sonar.batch.scan.report;
 
-import org.sonar.batch.protocol.input.BatchInput.User;
+import org.sonar.batch.issue.tracking.TrackedIssue;
 
+import org.sonar.batch.protocol.input.BatchInput.User;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.io.BufferedWriter;
@@ -57,7 +58,6 @@ import org.sonar.batch.issue.IssueCache;
 import org.sonar.batch.protocol.input.BatchInput;
 import org.sonar.batch.repository.user.UserRepositoryLoader;
 import org.sonar.batch.scan.filesystem.InputPathCache;
-import org.sonar.core.issue.DefaultIssue;
 import static com.google.common.collect.Sets.newHashSet;
 
 @Properties({
@@ -133,16 +133,20 @@ public class JSONReport implements Reporter {
 
   private void writeJsonIssues(JsonWriter json, Set<RuleKey> ruleKeys, Set<String> logins) throws IOException {
     json.name("issues").beginArray();
-    for (DefaultIssue issue : getIssues()) {
+    for (TrackedIssue issue : getIssues()) {
       if (issue.resolution() == null) {
         json
           .beginObject()
           .prop("key", issue.key())
           .prop("component", issue.componentKey())
-          .prop("line", issue.line())
-          .prop("message", issue.message())
+          .prop("line", issue.startLine())
+          .prop("startLine", issue.startLine())
+          .prop("startOffset", issue.startLineOffset())
+          .prop("endLine", issue.endLine())
+          .prop("endOffset", issue.endLineOffset())
+          .prop("message", issue.getMessage())
           .prop("severity", issue.severity())
-          .prop("rule", issue.ruleKey().toString())
+          .prop("rule", issue.getRuleKey().toString())
           .prop("status", issue.status())
           .prop("resolution", issue.resolution())
           .prop("isNew", issue.isNew())
@@ -156,7 +160,7 @@ public class JSONReport implements Reporter {
           logins.add(issue.assignee());
         }
         json.endObject();
-        ruleKeys.add(issue.ruleKey());
+        ruleKeys.add(issue.getRuleKey());
       }
     }
     json.endArray();
@@ -215,7 +219,7 @@ public class JSONReport implements Reporter {
   }
 
   private void writeUsers(JsonWriter json, Collection<String> userLogins) throws IOException {
-    List<BatchInput.User> users = new LinkedList<BatchInput.User>();
+    List<BatchInput.User> users = new LinkedList<>();
     for (String userLogin : userLogins) {
       User user = userRepository.load(userLogin);
       if (user != null) {
@@ -240,7 +244,7 @@ public class JSONReport implements Reporter {
   }
 
   @VisibleForTesting
-  Iterable<DefaultIssue> getIssues() {
+  Iterable<TrackedIssue> getIssues() {
     return issueCache.all();
   }
 }

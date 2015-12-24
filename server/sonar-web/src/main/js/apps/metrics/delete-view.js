@@ -1,11 +1,11 @@
-import ModalForm from 'components/common/modal-form';
-import './templates';
+import ModalForm from '../../components/common/modal-form';
+import Template from './templates/metrics-delete.hbs';
 
 export default ModalForm.extend({
-  template: Templates['metrics-delete'],
+  template: Template,
 
   onFormSubmit: function (e) {
-    this._super(e);
+    ModalForm.prototype.onFormSubmit.apply(this, arguments);
     this.sendRequest();
   },
 

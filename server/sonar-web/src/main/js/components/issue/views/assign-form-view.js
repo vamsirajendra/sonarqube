@@ -1,11 +1,12 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import ActionOptionsView from 'components/common/action-options-view';
-import '../templates';
+import ActionOptionsView from '../../common/action-options-view';
+import Template from '../templates/issue-assign-form.hbs';
+import OptionTemplate from '../templates/issue-assign-form-option.hbs';
 
 export default ActionOptionsView.extend({
-  template: Templates['issue-assign-form'],
-  optionTemplate: Templates['issue-assign-form-option'],
+  template: Template,
+  optionTemplate: OptionTemplate,
 
   events: function () {
     return _.extend(ActionOptionsView.prototype.events.apply(this, arguments), {
@@ -16,7 +17,7 @@ export default ActionOptionsView.extend({
   },
 
   initialize: function () {
-    this._super();
+    ActionOptionsView.prototype.initialize.apply(this, arguments);
     this.assignees = null;
     this.debouncedSearch = _.debounce(this.search, 250);
   },
@@ -31,7 +32,7 @@ export default ActionOptionsView.extend({
 
   onRender: function () {
     var that = this;
-    this._super();
+    ActionOptionsView.prototype.onRender.apply(this, arguments);
     this.renderTags();
     setTimeout(function () {
       that.$('input').focus();
@@ -54,7 +55,7 @@ export default ActionOptionsView.extend({
     var assignee = $(e.currentTarget).data('value'),
         assigneeName = $(e.currentTarget).data('text');
     this.submit(assignee, assigneeName);
-    return this._super(e);
+    return ActionOptionsView.prototype.selectOption.apply(this, arguments);
   },
 
   submit: function (assignee) {
@@ -121,7 +122,7 @@ export default ActionOptionsView.extend({
     if (this.assignees) {
       return this.assignees;
     }
-    var assignees = [{ id: '', text: t('unassigned') }],
+    var assignees = [{ id: '', text: window.t('unassigned') }],
         currentUser = window.SS.user,
         currentUserName = window.SS.userName;
     assignees.push({ id: currentUser, text: currentUserName });
@@ -137,5 +138,3 @@ export default ActionOptionsView.extend({
     });
   }
 });
-
-

@@ -1,10 +1,10 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import ActionOptionsView from 'components/common/action-options-view';
-import '../templates';
+import ActionOptionsView from '../../common/action-options-view';
+import Template from '../templates/issue-plan-form.hbs';
 
 export default ActionOptionsView.extend({
-  template: Templates['issue-plan-form'],
+  template: Template,
 
   getActionPlan: function () {
     return this.model.get('actionPlan') || '';
@@ -26,7 +26,7 @@ export default ActionOptionsView.extend({
   },
 
   getActionPlans: function () {
-    return [{ key: '', name: t('issue.unplanned') }].concat(this.collection.toJSON());
+    return [{ key: '', name: window.t('issue.unplanned') }].concat(this.collection.toJSON());
   },
 
   serializeData: function () {
@@ -35,5 +35,3 @@ export default ActionOptionsView.extend({
     });
   }
 });
-
-

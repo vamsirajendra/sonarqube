@@ -19,23 +19,22 @@
  */
 package org.sonar.batch.cache;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import org.sonar.batch.cache.WSLoader.LoadStrategy;
-
 import org.junit.Before;
-import org.mockito.MockitoAnnotations;
-import org.sonar.batch.bootstrap.ServerClient;
-import org.mockito.Mock;
-import org.sonar.home.cache.PersistentCache;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.sonar.batch.bootstrap.BatchWsClient;
+import org.sonar.batch.cache.WSLoader.LoadStrategy;
+import org.sonar.home.cache.PersistentCache;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class StrategyWSLoaderProviderTest {
   @Mock
   private PersistentCache cache;
 
   @Mock
-  private ServerClient client;
+  private BatchWsClient client;
 
   @Before
   public void setUp() {
@@ -47,7 +46,7 @@ public class StrategyWSLoaderProviderTest {
     StrategyWSLoaderProvider provider = new StrategyWSLoaderProvider(LoadStrategy.CACHE_FIRST);
     WSLoader wsLoader = provider.provide(cache, client);
 
-    assertThat(wsLoader.getStrategy()).isEqualTo(LoadStrategy.CACHE_FIRST);
+    assertThat(wsLoader.getDefaultStrategy()).isEqualTo(LoadStrategy.CACHE_FIRST);
   }
 
   @Test

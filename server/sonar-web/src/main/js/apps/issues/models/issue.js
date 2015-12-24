@@ -1,4 +1,4 @@
-import Issue from 'components/issue/models/issue';
+import Issue from '../../../components/issue/models/issue';
 
 export default Issue.extend({
   reset: function (attrs, options) {
@@ -6,7 +6,7 @@ export default Issue.extend({
     keepFields.forEach(function (field) {
       attrs[field] = this.get(field);
     }.bind(this));
-    return this._super(attrs, options);
+    return Issue.prototype.reset.call(this, attrs, options);
   }
 });
 

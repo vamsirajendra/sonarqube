@@ -19,13 +19,15 @@
  */
 package org.sonar.server.computation.issue;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.Date;
 import javax.annotation.Nullable;
 import org.sonar.api.issue.Issue;
-import org.sonar.core.util.Uuids;
 import org.sonar.core.issue.DefaultIssue;
 import org.sonar.core.issue.IssueChangeContext;
 import org.sonar.core.issue.IssueUpdater;
 import org.sonar.core.issue.workflow.IssueWorkflow;
+import org.sonar.core.util.Uuids;
 import org.sonar.server.computation.analysis.AnalysisMetadataHolder;
 
 /**
@@ -44,10 +46,15 @@ public class IssueLifecycle {
   private final DebtCalculator debtCalculator;
 
   public IssueLifecycle(AnalysisMetadataHolder analysisMetadataHolder, IssueWorkflow workflow, IssueUpdater updater, DebtCalculator debtCalculator) {
+    this(IssueChangeContext.createScan(new Date(analysisMetadataHolder.getAnalysisDate())), workflow, updater, debtCalculator);
+  }
+
+  @VisibleForTesting
+  IssueLifecycle(IssueChangeContext changeContext, IssueWorkflow workflow, IssueUpdater updater, DebtCalculator debtCalculator) {
     this.workflow = workflow;
     this.updater = updater;
     this.debtCalculator = debtCalculator;
-    this.changeContext = IssueChangeContext.createScan(analysisMetadataHolder.getAnalysisDate());
+    this.changeContext = changeContext;
   }
 
   public void initNewOpenIssue(DefaultIssue issue) {
@@ -70,6 +77,7 @@ public class IssueLifecycle {
     raw.setAssignee(base.assignee());
     raw.setAuthorLogin(base.authorLogin());
     raw.setTags(base.tags());
+    raw.setAttributes(base.attributes());
     raw.setDebt(debtCalculator.calculate(raw));
     raw.setOnDisabledRule(base.isOnDisabledRule());
     if (base.manualSeverity()) {
@@ -79,10 +87,9 @@ public class IssueLifecycle {
       updater.setPastSeverity(raw, base.severity(), changeContext);
     }
 
-    // TODO attributes
-
     // fields coming from raw
     updater.setPastLine(raw, base.getLine());
+    updater.setPastLocations(raw, base.getLocations());
     updater.setPastMessage(raw, base.getMessage(), changeContext);
     updater.setPastEffortToFix(raw, base.effortToFix(), changeContext);
     updater.setPastTechnicalDebt(raw, base.debt(), changeContext);

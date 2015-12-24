@@ -19,8 +19,6 @@
  */
 package org.sonar.batch.protocol.input;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -36,8 +34,7 @@ import org.sonar.batch.protocol.GsonHelper;
 public class ProjectRepositories {
 
   private long timestamp;
-  private Map<String, QProfile> qprofilesByLanguage = new HashMap<>();
-  private Collection<ActiveRule> activeRules = new ArrayList<>();
+  private boolean exists;
   private Map<String, Map<String, String>> settingsByModule = new HashMap<>();
   private Map<String, Map<String, FileData>> fileDataByModuleAndPath = new HashMap<>();
   private Date lastAnalysisDate;
@@ -45,7 +42,7 @@ public class ProjectRepositories {
   public Map<String, String> settings(String moduleKey) {
     return settingsByModule.containsKey(moduleKey) ? settingsByModule.get(moduleKey) : Collections.<String, String>emptyMap();
   }
-  
+
   public Map<String, Map<String, String>> settings() {
     return settingsByModule;
   }
@@ -60,22 +57,8 @@ public class ProjectRepositories {
     return this;
   }
 
-  public Collection<QProfile> qProfiles() {
-    return qprofilesByLanguage.values();
-  }
-
-  public ProjectRepositories addQProfile(QProfile qProfile) {
-    qprofilesByLanguage.put(qProfile.language(), qProfile);
-    return this;
-  }
-
-  public Collection<ActiveRule> activeRules() {
-    return activeRules;
-  }
-
-  public ProjectRepositories addActiveRule(ActiveRule activeRule) {
-    activeRules.add(activeRule);
-    return this;
+  public boolean exists() {
+    return exists;
   }
 
   public Map<String, Map<String, FileData>> fileDataByModuleAndPath() {
@@ -86,7 +69,11 @@ public class ProjectRepositories {
     return fileDataByModuleAndPath.containsKey(moduleKey) ? fileDataByModuleAndPath.get(moduleKey) : Collections.<String, FileData>emptyMap();
   }
 
-  public ProjectRepositories addFileData(String moduleKey, String path, FileData fileData) {
+  public ProjectRepositories addFileData(String moduleKey, @Nullable String path, FileData fileData) {
+    if (path == null || (fileData.hash() == null && fileData.revision() == null)) {
+      return this;
+    }
+
     Map<String, FileData> existingFileDataByPath = fileDataByModuleAndPath.get(moduleKey);
     if (existingFileDataByPath == null) {
       existingFileDataByPath = new HashMap<>();
@@ -125,5 +112,4 @@ public class ProjectRepositories {
   public static ProjectRepositories fromJson(String json) {
     return GsonHelper.create().fromJson(json, ProjectRepositories.class);
   }
-
 }

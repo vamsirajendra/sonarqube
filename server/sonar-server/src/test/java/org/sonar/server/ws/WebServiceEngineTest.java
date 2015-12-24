@@ -39,63 +39,14 @@ import org.sonar.api.server.ws.internal.ValidatingRequest;
 import org.sonar.server.exceptions.BadRequestException;
 import org.sonar.server.exceptions.Errors;
 import org.sonar.server.exceptions.Message;
-import org.sonar.server.plugins.MimeTypes;
 import org.sonar.server.tester.UserSessionRule;
+import org.sonarqube.ws.MediaTypes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class WebServiceEngineTest {
-
-  private static class SimpleRequest extends ValidatingRequest {
-    private final String method;
-    private Map<String, String> params = Maps.newHashMap();
-
-    private SimpleRequest(String method) {
-      this.method = method;
-    }
-
-    @Override
-    public String method() {
-      return method;
-    }
-
-    @Override
-    public String getMediaType() {
-      return MimeTypes.JSON;
-    }
-
-    @Override
-    public boolean hasParam(String key) {
-      return params.keySet().contains(key);
-    }
-
-    @Override
-    protected String readParam(String key) {
-      return params.get(key);
-    }
-
-    @Override
-    protected InputStream readInputStreamParam(String key) {
-      String param = readParam(key);
-
-      return param == null ? null : IOUtils.toInputStream(param);
-    }
-
-    public SimpleRequest setParams(Map<String, String> m) {
-      this.params = m;
-      return this;
-    }
-
-    public SimpleRequest setParam(String key, @Nullable String value) {
-      if (value != null) {
-        params.put(key, value);
-      }
-      return this;
-    }
-
-  }
 
   @Rule
   public UserSessionRule userSessionRule = UserSessionRule.standalone();
@@ -123,6 +74,15 @@ public class WebServiceEngineTest {
     ValidatingRequest request = new SimpleRequest("GET");
     ServletResponse response = new ServletResponse();
     engine.execute(request, response, "api/system", "health");
+
+    assertThat(response.stream().outputAsString()).isEqualTo("good");
+  }
+
+  @Test
+  public void execute_request_with_format_type() {
+    ValidatingRequest request = new SimpleRequest("GET");
+    ServletResponse response = new ServletResponse();
+    engine.execute(request, response, "api/system", "health.protobuf");
 
     assertThat(response.stream().outputAsString()).isEqualTo("good");
   }
@@ -240,7 +200,7 @@ public class WebServiceEngineTest {
 
     assertThat(response.stream().outputAsString()).isEqualTo("{\"errors\":[{\"msg\":\"Unexpected\"}]}");
     assertThat(response.stream().httpStatus()).isEqualTo(500);
-    assertThat(response.stream().mediaType()).isEqualTo(MimeTypes.JSON);
+    assertThat(response.stream().mediaType()).isEqualTo(MediaTypes.JSON);
   }
 
   @Test
@@ -256,7 +216,7 @@ public class WebServiceEngineTest {
       "{\"errors\":[{\"msg\":\"reason #0\"}]}"
       );
     assertThat(response.stream().httpStatus()).isEqualTo(400);
-    assertThat(response.stream().mediaType()).isEqualTo(MimeTypes.JSON);
+    assertThat(response.stream().mediaType()).isEqualTo(MediaTypes.JSON);
   }
 
   @Test
@@ -272,7 +232,7 @@ public class WebServiceEngineTest {
       + "{\"msg\":\"Bad request reason #2\"}"
       + "]}");
     assertThat(response.stream().httpStatus()).isEqualTo(400);
-    assertThat(response.stream().mediaType()).isEqualTo(MimeTypes.JSON);
+    assertThat(response.stream().mediaType()).isEqualTo(MediaTypes.JSON);
   }
 
   @Test
@@ -292,7 +252,7 @@ public class WebServiceEngineTest {
       "{\"msg\":\"reason #1\"}," +
       "{\"msg\":\"reason #2\"}]}");
     assertThat(response.stream().httpStatus()).isEqualTo(400);
-    assertThat(response.stream().mediaType()).isEqualTo(MimeTypes.JSON);
+    assertThat(response.stream().mediaType()).isEqualTo(MediaTypes.JSON);
   }
 
   @Test
@@ -305,11 +265,60 @@ public class WebServiceEngineTest {
     assertThat(response.getHeader(name)).isEqualTo(value);
   }
 
+  private static class SimpleRequest extends ValidatingRequest {
+    private final String method;
+    private Map<String, String> params = Maps.newHashMap();
+
+    private SimpleRequest(String method) {
+      this.method = method;
+    }
+
+    @Override
+    public String method() {
+      return method;
+    }
+
+    @Override
+    public String getMediaType() {
+      return MediaTypes.JSON;
+    }
+
+    @Override
+    public boolean hasParam(String key) {
+      return params.keySet().contains(key);
+    }
+
+    @Override
+    protected String readParam(String key) {
+      return params.get(key);
+    }
+
+    @Override
+    protected InputStream readInputStreamParam(String key) {
+      String param = readParam(key);
+
+      return param == null ? null : IOUtils.toInputStream(param);
+    }
+
+    public SimpleRequest setParams(Map<String, String> m) {
+      this.params = m;
+      return this;
+    }
+
+    public SimpleRequest setParam(String key, @Nullable String value) {
+      if (value != null) {
+        params.put(key, value);
+      }
+      return this;
+    }
+
+  }
+
   static class SystemWs implements WebService {
     @Override
     public void define(Context context) {
       NewController newController = context.createController("api/system");
-      newController.createAction("health")
+      createNewDefaultAction(newController, "health")
         .setHandler(new RequestHandler() {
           @Override
           public void handle(Request request, Response response) {
@@ -320,7 +329,7 @@ public class WebServiceEngineTest {
             }
           }
         });
-      newController.createAction("ping")
+      createNewDefaultAction(newController, "ping")
         .setPost(true)
         .setHandler(new RequestHandler() {
           @Override
@@ -332,21 +341,21 @@ public class WebServiceEngineTest {
             }
           }
         });
-      newController.createAction("fail")
+      createNewDefaultAction(newController, "fail")
         .setHandler(new RequestHandler() {
           @Override
           public void handle(Request request, Response response) {
             throw new IllegalStateException("Unexpected");
           }
         });
-      newController.createAction("fail_with_i18n_message")
+      createNewDefaultAction(newController, "fail_with_i18n_message")
         .setHandler(new RequestHandler() {
           @Override
           public void handle(Request request, Response response) {
             throw new BadRequestException("bad.request.reason", 0);
           }
         });
-      newController.createAction("fail_with_multiple_messages")
+      createNewDefaultAction(newController, "fail_with_multiple_messages")
         .createParam("count", "Number of error messages to generate")
         .setHandler(new RequestHandler() {
           @Override
@@ -358,7 +367,7 @@ public class WebServiceEngineTest {
             throw new BadRequestException(errors);
           }
         });
-      newController.createAction("fail_with_multiple_i18n_messages")
+      createNewDefaultAction(newController, "fail_with_multiple_i18n_messages")
         .createParam("count", "Number of error messages to generate")
         .setHandler(new RequestHandler() {
           @Override
@@ -370,7 +379,7 @@ public class WebServiceEngineTest {
             throw new BadRequestException(errors);
           }
         });
-      newController.createAction("alive")
+      createNewDefaultAction(newController, "alive")
         .setHandler(new RequestHandler() {
           @Override
           public void handle(Request request, Response response) {
@@ -378,7 +387,7 @@ public class WebServiceEngineTest {
           }
         });
 
-      newController.createAction("fail_with_undeclared_parameter")
+      createNewDefaultAction(newController, "fail_with_undeclared_parameter")
         .setHandler(new RequestHandler() {
           @Override
           public void handle(Request request, Response response) {
@@ -387,7 +396,7 @@ public class WebServiceEngineTest {
         });
 
       // parameter "message" is required but not "author"
-      NewAction print = newController.createAction("print");
+      NewAction print = createNewDefaultAction(newController, "print");
       print.createParam("message").setDescription("required message").setRequired(true);
       print.createParam("author").setDescription("optional author").setDefaultValue("-");
       print.createParam("format").setDescription("optional format").setPossibleValues("json", "xml");
@@ -404,6 +413,14 @@ public class WebServiceEngineTest {
         }
       });
       newController.done();
+    }
+
+    private NewAction createNewDefaultAction(NewController controller, String key) {
+      return controller
+        .createAction(key)
+        .setDescription("Dummy Description")
+        .setSince("5.3")
+        .setResponseExample(getClass().getResource("web-service-engine-test.txt"));
     }
   }
 }

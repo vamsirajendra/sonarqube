@@ -32,8 +32,8 @@ import static org.sonar.db.version.ColumnDefValidation.validateColumnName;
 
 public class DecimalColumnDef extends AbstractColumnDef {
 
-  public final static int DEFAULT_PRECISION = 38;
-  public final static int DEFAULT_SCALE = 20;
+  public static final int DEFAULT_PRECISION = 38;
+  public static final int DEFAULT_SCALE = 20;
 
   private final int precision;
   private final int scale;
@@ -77,7 +77,7 @@ public class DecimalColumnDef extends AbstractColumnDef {
     private String columnName;
     private int precision = DEFAULT_PRECISION;
     private int scale = DEFAULT_SCALE;
-    private boolean isNullable = false;
+    private boolean isNullable = true;
 
     public Builder setColumnName(String columnName) {
       this.columnName = validateColumnName(columnName);

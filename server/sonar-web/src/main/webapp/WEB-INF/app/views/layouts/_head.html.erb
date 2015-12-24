@@ -36,24 +36,17 @@
       updateCenterActive: <%= configuration('sonar.updatecenter.activate', true) %>
     };
   </script>
-  <script src="<%= ApplicationController.root_context -%>/js/sonar.js?v=<%= sonar_version -%>"></script>
+  <script src="<%= ApplicationController.root_context -%>/js/bundles/vendor.js?v=<%= sonar_version -%>"></script>
+  <script src="<%= ApplicationController.root_context -%>/js/bundles/sonar.js?v=<%= sonar_version -%>"></script>
   <script>
     var baseUrl = '<%= ApplicationController.root_context -%>';
     var $j = jQuery.noConflict();
     $j(document).ready(function () {$j('.open-modal').modal()});
-    moment.lang(window.pageLang);
     numeral.language(window.pageLang);
-    requirejs.config({
-      baseUrl: baseUrl + '/js',
-      urlArgs: 'v=<%= sonar_version -%>',
-      paths: {
-        'react': 'libs/third-party/react-with-addons',
-        'underscore': 'libs/third-party/shim/underscore-shim',
-        'jquery': 'libs/third-party/shim/jquery-shim',
-        'backbone': 'libs/third-party/shim/backbone-shim',
-        'backbone.marionette': 'libs/third-party/shim/marionette-shim'
-      }
-    });
+  </script>
+  <script>
+    window.sonarqube = {};
+    window.sonarqube.el = '#content';
   </script>
   <%= yield :script -%>
 </head>

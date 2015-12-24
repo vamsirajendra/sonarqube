@@ -25,11 +25,11 @@ import javax.annotation.Nullable;
 public class FileData {
 
   private final String hash;
-  private final boolean needBlame;
+  private final String revision;
 
-  public FileData(@Nullable String hash, boolean needBlame) {
+  public FileData(@Nullable String hash, @Nullable String revision) {
     this.hash = hash;
-    this.needBlame = needBlame;
+    this.revision = revision;
   }
 
   @CheckForNull
@@ -37,8 +37,8 @@ public class FileData {
     return hash;
   }
 
-  public boolean needBlame() {
-    return needBlame;
+  @CheckForNull
+  public String revision() {
+    return revision;
   }
-
 }

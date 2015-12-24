@@ -47,6 +47,8 @@ import org.sonar.server.user.UserSession;
 import org.sonar.server.user.index.UserIndex;
 
 import static com.google.common.collect.Sets.newHashSet;
+import static org.sonar.server.component.ComponentFinder.ParamNames.PROJECT_ID_AND_KEY;
+import static org.sonar.server.es.SearchOptions.MAX_LIMIT;
 import static org.sonar.server.measure.custom.ws.CustomMeasureValidator.checkPermissions;
 
 public class SearchAction implements CustomMeasuresWsAction {
@@ -76,7 +78,7 @@ public class SearchAction implements CustomMeasuresWsAction {
         "Requires 'Administer System' permission or 'Administer' permission on the project.")
       .setSince("5.2")
       .addFieldsParam(CustomMeasureJsonWriter.OPTIONAL_FIELDS)
-      .addPagingParams(100)
+      .addPagingParams(100, MAX_LIMIT)
       .setResponseExample(getClass().getResource("example-search.json"))
       .setHandler(this);
 
@@ -100,7 +102,7 @@ public class SearchAction implements CustomMeasuresWsAction {
 
     DbSession dbSession = dbClient.openSession(false);
     try {
-      ComponentDto project = componentFinder.getByUuidOrKey(dbSession, projectUuid, projectKey);
+      ComponentDto project = componentFinder.getByUuidOrKey(dbSession, projectUuid, projectKey, PROJECT_ID_AND_KEY);
       checkPermissions(userSession, project);
       Long lastAnalysisDateMs = searchLastSnapshot(dbSession, project);
       List<CustomMeasureDto> customMeasures = searchCustomMeasures(dbSession, project, searchOptions);

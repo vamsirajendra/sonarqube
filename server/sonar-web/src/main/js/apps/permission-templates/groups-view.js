@@ -1,17 +1,18 @@
+import _ from 'underscore';
 import Modal from '../../components/common/modals';
 import '../../components/common/select-list';
-import './templates';
+import Template from './templates/permission-templates-groups.hbs';
 
 function getSearchUrl (permission, permissionTemplate) {
-  return baseUrl + '/api/permissions/template_groups?ps=100&permission=' + permission +
+  return baseUrl + '/api/permissions/template_groups?ps=100&permission=' + permission.key +
       '&templateId=' + permissionTemplate.id;
 }
 
 export default Modal.extend({
-  template: Templates['permission-templates-groups'],
+  template: Template,
 
   onRender: function () {
-    this._super();
+    Modal.prototype.onRender.apply(this, arguments);
     new window.SelectList({
       el: this.$('#permission-templates-groups'),
       width: '100%',
@@ -25,7 +26,7 @@ export default Modal.extend({
       selectUrl: baseUrl + '/api/permissions/add_group_to_template',
       deselectUrl: baseUrl + '/api/permissions/remove_group_from_template',
       extra: {
-        permission: this.options.permission,
+        permission: this.options.permission.key,
         templateId: this.options.permissionTemplate.id
       },
       selectParameter: 'groupName',
@@ -41,11 +42,12 @@ export default Modal.extend({
     if (this.options.refresh) {
       this.options.refresh();
     }
-    this._super();
+    Modal.prototype.onDestroy.apply(this, arguments);
   },
 
   serializeData: function () {
     return _.extend(Modal.prototype.serializeData.apply(this, arguments), {
+      permissionName: this.options.permission.name,
       permissionTemplateName: this.options.permissionTemplate.name
     });
   }

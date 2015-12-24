@@ -15,7 +15,9 @@ var App = new Marionette.Application(),
     requestExporters = $.get(baseUrl + '/api/qualityprofiles/exporters').done(function (r) {
       App.exporters = r.exporters;
     }),
-    init = function (options) {
+    init = function () {
+      let options = window.sonarqube;
+
       // Layout
       this.layout = new Layout({ el: options.el });
       this.layout.render();
@@ -51,12 +53,12 @@ var App = new Marionette.Application(),
       });
     };
 
-App.on('start', function (options) {
-  $.when(window.requestMessages(), requestUser, requestExporters).done(function () {
-    init.call(App, options);
+App.on('start', function () {
+  $.when(requestUser, requestExporters).done(function () {
+    init.call(App);
   });
 });
 
-export default App;
+window.sonarqube.appStarted.then(options => App.start(options));
 
 

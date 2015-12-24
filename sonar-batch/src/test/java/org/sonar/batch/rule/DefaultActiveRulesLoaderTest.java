@@ -19,52 +19,67 @@
  */
 package org.sonar.batch.rule;
 
-import org.sonar.batch.repository.DefaultProjectRepositoriesFactory;
-
-import com.google.common.collect.ImmutableList;
-import org.sonar.batch.protocol.input.ActiveRule;
+import org.sonar.api.rule.RuleKey;
+import org.sonar.batch.cache.WSLoaderResult;
+import org.sonar.batch.cache.WSLoader;
+import com.google.common.io.Resources;
 import org.junit.Test;
-import org.sonar.batch.protocol.input.ProjectRepositories;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collection;
 
+import static org.mockito.Mockito.verify;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import org.junit.Before;
 
 public class DefaultActiveRulesLoaderTest {
   private DefaultActiveRulesLoader loader;
-  private DefaultProjectRepositoriesFactory factory;
-  private ProjectRepositories projectRepositories;
-
-  private ActiveRule response;
+  private WSLoader ws;
 
   @Before
   public void setUp() {
-    response = mock(ActiveRule.class);
-    when(response.ruleKey()).thenReturn("rule");
-
-    projectRepositories = new ProjectRepositories();
-    projectRepositories.addActiveRule(response);
-
-    factory = mock(DefaultProjectRepositoriesFactory.class);
-    when(factory.create()).thenReturn(projectRepositories);
-    loader = new DefaultActiveRulesLoader(factory);
+    ws = mock(WSLoader.class);
+    loader = new DefaultActiveRulesLoader(ws);
   }
 
   @Test
-  public void test() {
-    Collection<String> profiles = ImmutableList.of("profile1");
-    Collection<ActiveRule> activeRules = loader.load(profiles, "project");
+  public void feed_real_response_encode_qp() throws IOException {
+    InputStream response1 = loadResource("active_rule_search1.protobuf");
+    InputStream response2 = loadResource("active_rule_search2.protobuf");
 
-    assertThat(activeRules).hasSize(1);
-    assertThat(activeRules.iterator().next().ruleKey()).isEqualTo("rule");
+    String req1 = "/api/rules/search.protobuf?f=repo,name,severity,lang,internalKey,templateKey,params,actives&activation=true&qprofile=c%2B-test_c%2B-values-17445&p=1&ps=500";
+    String req2 = "/api/rules/search.protobuf?f=repo,name,severity,lang,internalKey,templateKey,params,actives&activation=true&qprofile=c%2B-test_c%2B-values-17445&p=2&ps=500";
+    when(ws.loadStream(req1)).thenReturn(new WSLoaderResult<InputStream>(response1, false));
+    when(ws.loadStream(req2)).thenReturn(new WSLoaderResult<InputStream>(response2, false));
 
-    verify(factory).create();
-    verifyNoMoreInteractions(factory);
+    Collection<LoadedActiveRule> activeRules = loader.load("c+-test_c+-values-17445", null);
+    assertThat(activeRules).hasSize(226);
+    assertActiveRule(activeRules);
+    
+    verify(ws).loadStream(req1);
+    verify(ws).loadStream(req2);
+    verifyNoMoreInteractions(ws);
+  }
+  
+  private static void assertActiveRule(Collection<LoadedActiveRule> activeRules) {
+    RuleKey key = RuleKey.of("squid", "S3008");
+    for (LoadedActiveRule r : activeRules) {
+      if (!r.getRuleKey().equals(key)) {
+        continue;
+      }
+
+      assertThat(r.getParams().get("format")).isEqualTo("^[a-z][a-zA-Z0-9]*$");
+      assertThat(r.getSeverity()).isEqualTo("MINOR");
+    }
+  }
+
+  private InputStream loadResource(String name) throws IOException {
+    return Resources.asByteSource(this.getClass().getResource("DefaultActiveRulesLoaderTest/" + name))
+      .openBufferedStream();
   }
 
 }

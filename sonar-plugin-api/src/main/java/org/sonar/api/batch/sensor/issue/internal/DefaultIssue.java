@@ -22,12 +22,10 @@ package org.sonar.api.batch.sensor.issue.internal;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.sonar.api.batch.rule.Severity;
 import org.sonar.api.batch.sensor.internal.DefaultStorable;
@@ -59,7 +57,6 @@ public class DefaultIssue extends DefaultStorable implements Issue, NewIssue {
   private Severity overriddenSeverity;
   private IssueLocation primaryLocation;
   private List<List<IssueLocation>> flows = new ArrayList<>();
-  private final Map<String, String> attributes = new LinkedHashMap<>();
 
   public DefaultIssue() {
     super(null);
@@ -102,6 +99,12 @@ public class DefaultIssue extends DefaultStorable implements Issue, NewIssue {
   }
 
   @Override
+  public NewIssue addLocation(NewIssueLocation secondaryLocation) {
+    flows.add(Arrays.asList((IssueLocation) secondaryLocation));
+    return this;
+  }
+
+  @Override
   public DefaultIssue addFlow(Iterable<NewIssueLocation> locations) {
     List<IssueLocation> flowAsList = new ArrayList<>();
     for (NewIssueLocation issueLocation : locations) {
@@ -109,17 +112,6 @@ public class DefaultIssue extends DefaultStorable implements Issue, NewIssue {
     }
     flows.add(flowAsList);
     return this;
-  }
-
-  @Override
-  public DefaultIssue addAttribute(String key, String value) {
-    attributes.put(key, value);
-    return this;
-  }
-
-  @Override
-  public Map<String, String> attributes() {
-    return ImmutableMap.copyOf(attributes);
   }
 
   @Override

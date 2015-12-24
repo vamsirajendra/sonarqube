@@ -22,47 +22,39 @@ package org.sonar.server.qualityprofile.ws;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.sonar.api.resources.Languages;
 import org.sonar.api.server.ws.RailsHandler;
 import org.sonar.api.server.ws.WebService;
+import org.sonar.server.qualityprofile.QProfileBackuper;
+import org.sonar.server.user.UserSession;
 import org.sonar.server.ws.WsTester;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
-@RunWith(MockitoJUnitRunner.class)
 public class ProfilesWsTest {
 
-  WsTester tester;
+  WsTester ws;
 
   @Before
   public void setUp() {
-    tester = new WsTester(new ProfilesWs());
+    ws = new WsTester(new ProfilesWs(
+      new OldRestoreAction(mock(QProfileBackuper.class), mock(Languages.class), mock(UserSession.class))
+      ));
   }
 
   @Test
   public void define_controller() {
-    WebService.Controller controller = tester.controller("api/profiles");
+    WebService.Controller controller = controller();
     assertThat(controller).isNotNull();
     assertThat(controller.path()).isEqualTo("api/profiles");
     assertThat(controller.description()).isNotEmpty();
-    assertThat(controller.actions()).hasSize(6);
-  }
-
-  @Test
-  public void define_list_action() {
-    WebService.Controller controller = tester.controller("api/profiles");
-
-    WebService.Action restoreProfiles = controller.action("list");
-    assertThat(restoreProfiles).isNotNull();
-    assertThat(restoreProfiles.handler()).isInstanceOf(RailsHandler.class);
-    assertThat(restoreProfiles.responseExampleAsString()).isNotEmpty();
-    assertThat(restoreProfiles.params()).hasSize(3);
+    assertThat(controller.actions()).hasSize(3);
   }
 
   @Test
   public void define_index_action() {
-    WebService.Controller controller = tester.controller("api/profiles");
+    WebService.Controller controller = ws.controller("api/profiles");
 
     WebService.Action restoreProfiles = controller.action("index");
     assertThat(restoreProfiles).isNotNull();
@@ -72,42 +64,17 @@ public class ProfilesWsTest {
   }
 
   @Test
-  public void define_backup_action() {
-    WebService.Controller controller = tester.controller("api/profiles");
+  public void define_list_action() {
+    WebService.Controller controller = controller();
 
-    WebService.Action restoreProfiles = controller.action("backup");
-    assertThat(restoreProfiles).isNotNull();
-    assertThat(restoreProfiles.handler()).isInstanceOf(RailsHandler.class);
-    assertThat(restoreProfiles.params()).hasSize(3);
+    WebService.Action listProfiles = controller.action("list");
+    assertThat(listProfiles).isNotNull();
+    assertThat(listProfiles.handler()).isInstanceOf(RailsHandler.class);
+    assertThat(listProfiles.responseExampleAsString()).isNotEmpty();
+    assertThat(listProfiles.params()).hasSize(3);
   }
 
-  @Test
-  public void define_restore_action() {
-    WebService.Controller controller = tester.controller("api/profiles");
-
-    WebService.Action restoreProfiles = controller.action("restore");
-    assertThat(restoreProfiles).isNotNull();
-    assertThat(restoreProfiles.handler()).isInstanceOf(RailsHandler.class);
-    assertThat(restoreProfiles.params()).hasSize(2);
-  }
-
-  @Test
-  public void define_destroy_action() {
-    WebService.Controller controller = tester.controller("api/profiles");
-
-    WebService.Action restoreProfiles = controller.action("destroy");
-    assertThat(restoreProfiles).isNotNull();
-    assertThat(restoreProfiles.handler()).isInstanceOf(RailsHandler.class);
-    assertThat(restoreProfiles.params()).hasSize(2);
-  }
-
-  @Test
-  public void define_set_as_default_action() {
-    WebService.Controller controller = tester.controller("api/profiles");
-
-    WebService.Action restoreProfiles = controller.action("set_as_default");
-    assertThat(restoreProfiles).isNotNull();
-    assertThat(restoreProfiles.handler()).isInstanceOf(RailsHandler.class);
-    assertThat(restoreProfiles.params()).hasSize(2);
+  private WebService.Controller controller() {
+    return ws.controller("api/profiles");
   }
 }

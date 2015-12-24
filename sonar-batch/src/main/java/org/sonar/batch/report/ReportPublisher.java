@@ -19,61 +19,65 @@
  */
 package org.sonar.batch.report;
 
-import com.github.kevinsawicki.http.HttpRequest;
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.util.Date;
+import com.google.common.base.Throwables;
+import com.google.common.io.Files;
+import com.squareup.okhttp.HttpUrl;
 import org.apache.commons.io.FileUtils;
 import org.picocontainer.Startable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.sonar.api.CoreProperties;
 import org.sonar.api.batch.BatchSide;
 import org.sonar.api.batch.bootstrap.ProjectDefinition;
 import org.sonar.api.config.Settings;
-import org.sonar.api.platform.Server;
 import org.sonar.api.utils.TempFolder;
 import org.sonar.api.utils.ZipUtils;
+import org.sonar.api.utils.log.Logger;
+import org.sonar.api.utils.log.Loggers;
 import org.sonar.batch.analysis.DefaultAnalysisMode;
-import org.sonar.batch.bootstrap.ServerClient;
+import org.sonar.batch.bootstrap.BatchWsClient;
 import org.sonar.batch.protocol.output.BatchReportWriter;
 import org.sonar.batch.scan.ImmutableProjectReactor;
-import org.sonar.batch.util.BatchUtils;
+import org.sonarqube.ws.MediaTypes;
+import org.sonarqube.ws.WsCe;
+import org.sonarqube.ws.client.PostRequest;
+import org.sonarqube.ws.client.WsResponse;
 
-import static java.lang.String.format;
+import javax.annotation.Nullable;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Writer;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @BatchSide
 public class ReportPublisher implements Startable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ReportPublisher.class);
-  public static final String KEEP_REPORT_PROP_KEY = "sonar.batch.keepReport";
-  public static final String DUMP_REPORT_PROP_KEY = "sonar.batch.dumpReportDir";
+  private static final Logger LOG = Loggers.get(ReportPublisher.class);
 
-  private final ServerClient serverClient;
-  private final Server server;
+  public static final String KEEP_REPORT_PROP_KEY = "sonar.batch.keepReport";
+  public static final String VERBOSE_KEY = "sonar.verbose";
+  public static final String METADATA_DUMP_FILENAME = "report-task.txt";
+
   private final Settings settings;
+  private final BatchWsClient wsClient;
+  private final AnalysisContextReportPublisher contextPublisher;
   private final ImmutableProjectReactor projectReactor;
   private final DefaultAnalysisMode analysisMode;
   private final TempFolder temp;
-  private final AnalysisContextReportPublisher contextPublisher;
-
-  private ReportPublisherStep[] publishers;
+  private final ReportPublisherStep[] publishers;
 
   private File reportDir;
   private BatchReportWriter writer;
 
-  public ReportPublisher(Settings settings, ServerClient serverClient, Server server, AnalysisContextReportPublisher contextPublisher,
-    ImmutableProjectReactor projectReactor, DefaultAnalysisMode analysisMode, TempFolder temp, ReportPublisherStep[] publishers) {
-    this.serverClient = serverClient;
-    this.server = server;
+  public ReportPublisher(Settings settings, BatchWsClient wsClient, AnalysisContextReportPublisher contextPublisher,
+                         ImmutableProjectReactor projectReactor, DefaultAnalysisMode analysisMode, TempFolder temp, ReportPublisherStep[] publishers) {
+    this.settings = settings;
+    this.wsClient = wsClient;
     this.contextPublisher = contextPublisher;
     this.projectReactor = projectReactor;
-    this.settings = settings;
     this.analysisMode = analysisMode;
     this.temp = temp;
     this.publishers = publishers;
@@ -88,10 +92,10 @@ public class ReportPublisher implements Startable {
 
   @Override
   public void stop() {
-    if (!settings.getBoolean(KEEP_REPORT_PROP_KEY)) {
+    if (!settings.getBoolean(KEEP_REPORT_PROP_KEY) && !settings.getBoolean(VERBOSE_KEY)) {
       FileUtils.deleteQuietly(reportDir);
     } else {
-      LOG.info("Batch report generated in " + reportDir);
+      LOG.info("Analysis report generated in " + reportDir);
     }
   }
 
@@ -105,121 +109,121 @@ public class ReportPublisher implements Startable {
 
   public void execute() {
     // If this is a issues mode analysis then we should not upload reports
+    String taskId = null;
     if (!analysisMode.isIssues()) {
-      File report = prepareReport();
+      File report = generateReportFile();
       if (!analysisMode.isMediumTest()) {
-        sendOrDumpReport(report);
+        taskId = upload(report);
       }
     }
-    logSuccess(LoggerFactory.getLogger(getClass()));
+    logSuccess(taskId);
   }
 
-  private File prepareReport() {
+  private File generateReportFile() {
     try {
       long startTime = System.currentTimeMillis();
       for (ReportPublisherStep publisher : publishers) {
         publisher.publish(writer);
       }
       long stopTime = System.currentTimeMillis();
-      LOG.info("Analysis reports generated in " + (stopTime - startTime) + "ms, dir size=" + FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(reportDir)));
+      LOG.info("Analysis report generated in {}ms, dir size={}", stopTime - startTime, FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(reportDir)));
 
       startTime = System.currentTimeMillis();
       File reportZip = temp.newFile("batch-report", ".zip");
       ZipUtils.zipDir(reportDir, reportZip);
       stopTime = System.currentTimeMillis();
-      LOG.info("Analysis reports compressed in " + (stopTime - startTime) + "ms, zip size=" + FileUtils.byteCountToDisplaySize(FileUtils.sizeOf(reportZip)));
+      LOG.info("Analysis reports compressed in {}ms, zip size={}", stopTime - startTime, FileUtils.byteCountToDisplaySize(FileUtils.sizeOf(reportZip)));
       return reportZip;
     } catch (IOException e) {
-      throw new IllegalStateException("Unable to prepare batch report", e);
+      throw new IllegalStateException("Unable to prepare analysis report", e);
     }
   }
 
+  /**
+   * Uploads the report file to server and returns the generated task id
+   */
   @VisibleForTesting
-  void sendOrDumpReport(File report) {
-    ProjectDefinition projectDefinition = projectReactor.getRoot();
-    String effectiveKey = projectDefinition.getKeyWithBranch();
-    String relativeUrl = String.format("/api/ce/submit?projectKey=%s&projectName=%s&projectBranch=%s",
-      projectDefinition.getKey(), BatchUtils.encodeForUrl(projectDefinition.getName()), BatchUtils.encodeForUrl(projectDefinition.getBranch()));
-
-    String dumpDirLocation = settings.getString(DUMP_REPORT_PROP_KEY);
-    if (dumpDirLocation == null) {
-      uploadMultiPartReport(report, relativeUrl);
-    } else {
-      dumpReport(dumpDirLocation, effectiveKey, relativeUrl, report);
-    }
-  }
-
-  private void uploadMultiPartReport(File report, String relativeUrl) {
-    LOG.debug("Publish results");
+  String upload(File report) {
+    LOG.debug("Upload report");
     long startTime = System.currentTimeMillis();
-    URL url;
-    try {
-      url = new URL(serverClient.getURL() + relativeUrl);
-    } catch (MalformedURLException e) {
-      throw new IllegalArgumentException("Invalid URL", e);
+    ProjectDefinition projectDefinition = projectReactor.getRoot();
+    PostRequest.Part filePart = new PostRequest.Part(MediaTypes.ZIP, report);
+    PostRequest post = new PostRequest("api/ce/submit")
+      .setMediaType(MediaTypes.PROTOBUF)
+      .setParam("projectKey", projectDefinition.getKey())
+      .setParam("projectName", projectDefinition.getName())
+      .setParam("projectBranch", projectDefinition.getBranch())
+      .setPart("report", filePart);
+    WsResponse response = wsClient.call(post).failIfNotSuccessful();
+    try (InputStream protobuf = response.contentStream()) {
+      return WsCe.SubmitResponse.parser().parseFrom(protobuf).getTaskId();
+    } catch (Exception e) {
+      throw Throwables.propagate(e);
+    } finally {
+      long stopTime = System.currentTimeMillis();
+      LOG.info("Analysis report uploaded in " + (stopTime - startTime) + "ms");
     }
-    HttpRequest request = HttpRequest.post(url);
-    request.trustAllCerts();
-    request.trustAllHosts();
-    request.header("User-Agent", format("SonarQube %s", server.getVersion()));
-    request.basic(serverClient.getLogin(), serverClient.getPassword());
-    request.part("report", null, "application/octet-stream", report);
-    if (!request.ok()) {
-      int responseCode = request.code();
-      if (responseCode == 401) {
-        throw new IllegalStateException(format(serverClient.getMessageWhenNotAuthorized(), CoreProperties.LOGIN, CoreProperties.PASSWORD));
-      }
-      if (responseCode == 403) {
-        // SONAR-4397 Details are in response content
-        throw new IllegalStateException(request.body());
-      }
-      throw new IllegalStateException(format("Fail to execute request [code=%s, url=%s]: %s", responseCode, url, request.body()));
-    }
-    long stopTime = System.currentTimeMillis();
-    LOG.info("Analysis reports sent to server in " + (stopTime - startTime) + "ms");
-  }
-
-  private void dumpReport(String dumpDirLocation, String projectKey, String relativeUrl, File report) {
-    LOG.debug("Dump report to file");
-    try {
-      dumpReportImpl(dumpDirLocation, projectKey, relativeUrl, report);
-    } catch (IOException | URISyntaxException e) {
-      LOG.error("Failed to dump report to directory " + dumpDirLocation, e);
-    }
-  }
-
-  private static void dumpReportImpl(String dumpDirLocation, String projectKey, String relativeUrl, File report) throws IOException, URISyntaxException {
-    File dumpDir = new File(dumpDirLocation);
-    if (!dumpDir.exists() || !dumpDir.isDirectory()) {
-      LOG.warn("Report dump directory '{}' does not exist or is not a directory", dumpDirLocation);
-      return;
-    }
-    long dateTime = new Date().getTime();
-    File dumpedZip = new File(dumpDir, format("batch-report_%s_%s.zip", projectKey, dateTime));
-    FileUtils.copyFile(report, new FileOutputStream(dumpedZip));
-    File dumpedMetadata = new File(dumpDir, format("batch-report_%s_%s.txt", projectKey, dateTime));
-    FileUtils.write(dumpedMetadata, relativeUrl);
-    LOG.info("Batch report dumped to {}", dumpedZip.getAbsolutePath());
   }
 
   @VisibleForTesting
-  void logSuccess(Logger logger) {
-    if (analysisMode.isIssues() || analysisMode.isMediumTest()) {
-      logger.info("ANALYSIS SUCCESSFUL");
-
+  void logSuccess(@Nullable String taskId) {
+    if (taskId == null) {
+      LOG.info("ANALYSIS SUCCESSFUL");
     } else {
-      String baseUrl = settings.getString(CoreProperties.SERVER_BASE_URL);
-      if (baseUrl.equals(settings.getDefaultValue(CoreProperties.SERVER_BASE_URL))) {
-        // If server base URL was not configured in Sonar server then is is better to take URL configured on batch side
-        baseUrl = serverClient.getURL();
-      }
-      if (!baseUrl.endsWith("/")) {
-        baseUrl += "/";
-      }
+      Map<String, String> metadata = new LinkedHashMap<>();
       String effectiveKey = projectReactor.getRoot().getKeyWithBranch();
-      String url = baseUrl + "dashboard/index/" + effectiveKey;
-      logger.info("ANALYSIS SUCCESSFUL, you can browse {}", url);
-      logger.info("Note that you will be able to access the updated dashboard once the server has processed the submitted analysis report.");
+      metadata.put("projectKey", effectiveKey);
+      metadata.put("serverUrl", publicUrl());
+      
+      URL dashboardUrl = HttpUrl.parse(publicUrl()).newBuilder()
+        .addPathSegment("dashboard").addPathSegment("index").addPathSegment(effectiveKey)
+        .build()
+        .url();
+      metadata.put("dashboardUrl", dashboardUrl.toExternalForm());
+
+      URL taskUrl = HttpUrl.parse(publicUrl()).newBuilder()
+        .addPathSegment("api").addPathSegment("ce").addPathSegment("task")
+        .addQueryParameter("id", taskId)
+        .build()
+        .url();
+      metadata.put("ceTaskId", taskId);
+      metadata.put("ceTaskUrl", taskUrl.toExternalForm());
+
+      LOG.info("ANALYSIS SUCCESSFUL, you can browse {}", dashboardUrl);
+      LOG.info("Note that you will be able to access the updated dashboard once the server has processed the submitted analysis report");
+      LOG.info("More about the report processing at {}", taskUrl);
+
+      dumpMetadata(metadata);
     }
+  }
+
+  private void dumpMetadata(Map<String, String> metadata) {
+    File file = new File(projectReactor.getRoot().getWorkDir(), METADATA_DUMP_FILENAME);
+    try (Writer output = Files.newWriter(file, StandardCharsets.UTF_8)) {
+      for (Map.Entry<String, String> entry : metadata.entrySet()) {
+        output.write(entry.getKey());
+        output.write("=");
+        output.write(entry.getValue());
+        output.write("\n");
+      }
+
+      LOG.debug("Report metadata written to {}", file);
+    } catch (IOException e) {
+      throw new IllegalStateException("Unable to dump " + file, e);
+    }
+  }
+
+  /**
+   * The public URL is optionally configured on server. If not, then the regular URL is returned.
+   * See https://jira.sonarsource.com/browse/SONAR-4239
+   */
+  private String publicUrl() {
+    String baseUrl = settings.getString(CoreProperties.SERVER_BASE_URL);
+    if (baseUrl.equals(settings.getDefaultValue(CoreProperties.SERVER_BASE_URL))) {
+      // crap workaround for https://jira.sonarsource.com/browse/SONAR-7109
+      // If server base URL was not configured in Sonar server then is is better to take URL configured on batch side
+      baseUrl = wsClient.baseUrl();
+    }
+    return baseUrl.replaceAll("(/)+$", "");
   }
 }

@@ -24,6 +24,9 @@ import com.google.common.base.Optional;
 import org.sonar.db.DbSession;
 import org.sonar.db.component.ComponentDto;
 import org.sonar.server.permission.PermissionChange;
+import org.sonar.server.usergroups.ws.WsGroupRef;
+
+import static org.sonar.server.permission.ws.PermissionRequestValidator.validatePermission;
 
 public class PermissionChangeBuilder {
 
@@ -33,28 +36,29 @@ public class PermissionChangeBuilder {
     this.dependenciesFinder = dependenciesFinder;
   }
 
-  public PermissionChange buildUserPermissionChange(DbSession dbSession, PermissionRequest request) {
+  public PermissionChange buildUserPermissionChange(DbSession dbSession, String permission, Optional<WsProjectRef> projectRef, String login) {
     PermissionChange permissionChange = new PermissionChange()
-      .setPermission(request.permission())
-      .setUserLogin(request.userLogin());
-    addProjectToPermissionChange(dbSession, permissionChange, request);
+      .setPermission(permission)
+      .setUserLogin(login);
+    addProjectToPermissionChange(dbSession, permissionChange, projectRef);
 
     return permissionChange;
   }
 
-  public PermissionChange buildGroupPermissionChange(DbSession dbSession, PermissionRequest request) {
-    String groupName = dependenciesFinder.getGroupName(dbSession, request);
+  public PermissionChange buildGroupPermissionChange(DbSession dbSession, String permission, Optional<WsProjectRef> projectRef, WsGroupRef groupRef) {
+    validatePermission(permission, projectRef);
+    String groupName = dependenciesFinder.getGroupName(dbSession, groupRef);
 
     PermissionChange permissionChange = new PermissionChange()
-      .setPermission(request.permission())
+      .setPermission(permission)
       .setGroupName(groupName);
-    addProjectToPermissionChange(dbSession, permissionChange, request);
+    addProjectToPermissionChange(dbSession, permissionChange, projectRef);
 
     return permissionChange;
   }
 
-  private void addProjectToPermissionChange(DbSession dbSession, PermissionChange permissionChange, PermissionRequest request) {
-    Optional<ComponentDto> project = dependenciesFinder.searchProject(dbSession, request);
+  private void addProjectToPermissionChange(DbSession dbSession, PermissionChange permissionChange, Optional<WsProjectRef> projectRef) {
+    Optional<ComponentDto> project = dependenciesFinder.searchProject(dbSession, projectRef);
     if (project.isPresent()) {
       permissionChange.setComponentKey(project.get().key());
     }

@@ -24,6 +24,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -40,6 +41,7 @@ import static com.google.common.collect.Maps.newHashMap;
 
 public abstract class AbstractUserSession<T extends AbstractUserSession> implements UserSession {
   protected static final String INSUFFICIENT_PRIVILEGES_MESSAGE = "Insufficient privileges";
+  private static final ForbiddenException INSUFFICIENT_PRIVILEGES_EXCEPTION = new ForbiddenException(INSUFFICIENT_PRIVILEGES_MESSAGE);
 
   protected Integer userId;
   protected String login;
@@ -141,6 +143,18 @@ public abstract class AbstractUserSession<T extends AbstractUserSession> impleme
   }
 
   @Override
+  public UserSession checkAnyGlobalPermissions(Collection<String> globalPermissionsToTest) {
+    List<String> userGlobalPermissions = globalPermissions();
+    for (String userGlobalPermission : userGlobalPermissions) {
+      if (globalPermissionsToTest.contains(userGlobalPermission)) {
+        return this;
+      }
+    }
+
+    throw new ForbiddenException(INSUFFICIENT_PRIVILEGES_MESSAGE);
+  }
+
+  @Override
   public boolean hasGlobalPermission(String globalPermission) {
     return globalPermissions().contains(globalPermission);
   }
@@ -175,5 +189,9 @@ public abstract class AbstractUserSession<T extends AbstractUserSession> impleme
       throw new ForbiddenException(INSUFFICIENT_PRIVILEGES_MESSAGE);
     }
     return this;
+  }
+
+  public static ForbiddenException insufficientPrivilegesException() {
+    return INSUFFICIENT_PRIVILEGES_EXCEPTION;
   }
 }

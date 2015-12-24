@@ -23,6 +23,7 @@ package org.sonar.db.component;
 import java.util.List;
 import javax.annotation.CheckForNull;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.session.RowBounds;
 
 public interface SnapshotMapper {
 
@@ -34,9 +35,16 @@ public interface SnapshotMapper {
   @CheckForNull
   SnapshotDto selectLastSnapshot(Long resourceId);
 
+  int countLastSnapshotByComponentUuid(String componentUuid);
+
+  @CheckForNull
+  SnapshotDto selectLastSnapshotByComponentUuid(String componentUuid);
+
   List<SnapshotDto> selectSnapshotsByQuery(@Param("query") SnapshotQuery query);
 
   List<SnapshotDto> selectPreviousVersionSnapshots(@Param(value = "componentId") Long componentId, @Param(value = "lastVersion") String lastVersion);
+
+  List<SnapshotDto> selectOldestSnapshots(@Param(value = "componentId") Long componentId, RowBounds rowBounds);
 
   List<SnapshotDto> selectSnapshotAndChildrenOfScope(@Param(value = "snapshot") Long resourceId, @Param(value = "scope") String scope);
 

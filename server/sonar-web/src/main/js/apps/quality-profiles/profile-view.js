@@ -1,11 +1,13 @@
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/quality-profiles-profile.hbs';
+import { formatMeasure } from '../../helpers/measures';
+
 
 export default Marionette.ItemView.extend({
   tagName: 'a',
   className: 'list-group-item',
-  template: Templates['quality-profiles-profile'],
+  template: Template,
 
   modelEvents: {
     'change': 'render'
@@ -33,7 +35,7 @@ export default Marionette.ItemView.extend({
 
   serializeData: function () {
     return _.extend(Marionette.ItemView.prototype.serializeData.apply(this, arguments), {
-      projectCountFormatted: window.formatMeasure(this.model.get('projectCount'), 'INT')
+      projectCountFormatted: formatMeasure(this.model.get('projectCount'), 'INT')
     });
   }
 });

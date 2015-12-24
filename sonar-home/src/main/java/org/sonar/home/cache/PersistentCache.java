@@ -22,22 +22,17 @@ package org.sonar.home.cache;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
@@ -47,41 +42,37 @@ public class PersistentCache {
   private static final char[] hexArray = "0123456789ABCDEF".toCharArray();
   private static final Charset ENCODING = StandardCharsets.UTF_8;
   private static final String DIGEST_ALGO = "MD5";
-  private static final String LOCK_FNAME = ".lock";
 
-  // eviction strategy is to expire entries after modification once a time duration has elapsed
-  private final long defaultDurationToExpireMs;
+  private final PersistentCacheInvalidation invalidation;
   private final Logger logger;
-  private final String version;
-  private final Path baseDir;
+  private final Path dir;
+  private DirectoryLock lock;
 
-  public PersistentCache(Path baseDir, long defaultDurationToExpireMs, Logger logger, String version) {
-    this.baseDir = baseDir;
-    this.defaultDurationToExpireMs = defaultDurationToExpireMs;
+  public PersistentCache(Path dir, PersistentCacheInvalidation invalidation, Logger logger, DirectoryLock lock) {
+    this.dir = dir;
+    this.invalidation = invalidation;
     this.logger = logger;
-    this.version = version;
+    this.lock = lock;
 
     reconfigure();
-    logger.debug("cache: " + baseDir + ", default expiration time (ms): " + defaultDurationToExpireMs);
+    logger.debug("cache: " + dir);
   }
 
   public synchronized void reconfigure() {
     try {
-      Files.createDirectories(baseDir);
+      Files.createDirectories(dir);
     } catch (IOException e) {
       throw new IllegalStateException("failed to create cache dir", e);
     }
   }
 
-  public Path getBaseDirectory() {
-    return baseDir;
+  public Path getDirectory() {
+    return dir;
   }
 
   @CheckForNull
-  public synchronized String getString(@Nonnull String obj, @Nullable final PersistentCacheLoader<String> valueLoader) throws IOException {
-    ValueLoaderDecoder decoder = valueLoader != null ? new ValueLoaderDecoder(valueLoader) : null;
-
-    byte[] cached = get(obj, decoder);
+  public synchronized String getString(@Nonnull String obj) throws IOException {
+    byte[] cached = get(obj);
 
     if (cached == null) {
       return null;
@@ -97,7 +88,10 @@ public class PersistentCache {
     try {
       lock();
       Path path = getCacheCopy(key);
-      return new DeleteOnCloseInputStream(new FileInputStream(path.toFile()), path);
+      if (path == null) {
+        return null;
+      }
+      return new DeleteFileOnCloseInputStream(new FileInputStream(path.toFile()), path);
 
     } finally {
       unlock();
@@ -105,7 +99,7 @@ public class PersistentCache {
   }
 
   @CheckForNull
-  public synchronized byte[] get(@Nonnull String obj, @Nullable PersistentCacheLoader<byte[]> valueLoader) throws IOException {
+  public synchronized byte[] get(@Nonnull String obj) throws IOException {
     String key = getKey(obj);
 
     try {
@@ -119,14 +113,6 @@ public class PersistentCache {
       }
 
       logger.debug("cache miss for " + obj + " -> " + key);
-
-      if (valueLoader != null) {
-        byte[] value = valueLoader.get();
-        if (value != null) {
-          putCache(key, value);
-        }
-        return value;
-      }
     } finally {
       unlock();
     }
@@ -176,7 +162,7 @@ public class PersistentCache {
     logger.info("cache: cleaning");
     try {
       lock();
-      deleteCacheEntries(new DirectoryCleanFilter(defaultDurationToExpireMs));
+      deleteCacheEntries(new DirectoryCleanFilter());
     } catch (IOException e) {
       logger.error("Error cleaning cache", e);
     } finally {
@@ -185,49 +171,16 @@ public class PersistentCache {
   }
 
   private void lock() throws IOException {
-    lockRandomAccessFile = new RandomAccessFile(getLockPath().toFile(), "rw");
-    lockChannel = lockRandomAccessFile.getChannel();
-    lockFile = lockChannel.lock();
+    lock.lock();
   }
-
-  private RandomAccessFile lockRandomAccessFile;
-  private FileChannel lockChannel;
-  private FileLock lockFile;
 
   private void unlock() {
-    if (lockFile != null) {
-      try {
-        lockFile.release();
-      } catch (IOException e) {
-        logger.error("Error releasing lock", e);
-      }
-    }
-    if (lockChannel != null) {
-      try {
-        lockChannel.close();
-      } catch (IOException e) {
-        logger.error("Error closing file channel", e);
-      }
-    }
-    if (lockRandomAccessFile != null) {
-      try {
-        lockRandomAccessFile.close();
-      } catch (IOException e) {
-        logger.error("Error closing file", e);
-      }
-    }
-
-    lockFile = null;
-    lockRandomAccessFile = null;
-    lockChannel = null;
+    lock.unlock();
   }
 
-  private String getKey(String uri) {
+  private static String getKey(String uri) {
     try {
       String key = uri;
-      if (version != null) {
-        key += version;
-      }
       MessageDigest digest = MessageDigest.getInstance(DIGEST_ALGO);
       digest.update(key.getBytes(StandardCharsets.UTF_8));
       return byteArrayToHex(digest.digest());
@@ -237,7 +190,7 @@ public class PersistentCache {
   }
 
   private void deleteCacheEntries(DirectoryStream.Filter<Path> filter) throws IOException {
-    try (DirectoryStream<Path> stream = Files.newDirectoryStream(baseDir, filter)) {
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, filter)) {
       for (Path p : stream) {
         try {
           Files.delete(p);
@@ -248,44 +201,21 @@ public class PersistentCache {
     }
   }
 
-  private static class ValueLoaderDecoder implements PersistentCacheLoader<byte[]> {
-    PersistentCacheLoader<String> valueLoader;
-
-    ValueLoaderDecoder(PersistentCacheLoader<String> valueLoader) {
-      this.valueLoader = valueLoader;
-    }
-
+  private class DirectoryClearFilter implements DirectoryStream.Filter<Path> {
     @Override
-    public byte[] get() throws IOException {
-      String s = valueLoader.get();
-      if (s != null) {
-        return s.getBytes(ENCODING);
-      }
-      return null;
+    public boolean accept(Path entry) throws IOException {
+      return !lock.getFileLockName().equals(entry.getFileName().toString());
     }
   }
 
-  private static class DirectoryClearFilter implements DirectoryStream.Filter<Path> {
+  private class DirectoryCleanFilter implements DirectoryStream.Filter<Path> {
     @Override
     public boolean accept(Path entry) throws IOException {
-      return !LOCK_FNAME.equals(entry.getFileName().toString());
-    }
-  }
-
-  private static class DirectoryCleanFilter implements DirectoryStream.Filter<Path> {
-    private long defaultDurationToExpireMs;
-
-    DirectoryCleanFilter(long defaultDurationToExpireMs) {
-      this.defaultDurationToExpireMs = defaultDurationToExpireMs;
-    }
-
-    @Override
-    public boolean accept(Path entry) throws IOException {
-      if (LOCK_FNAME.equals(entry.getFileName().toString())) {
+      if (lock.getFileLockName().equals(entry.getFileName().toString())) {
         return false;
       }
 
-      return isCacheEntryExpired(entry, defaultDurationToExpireMs);
+      return invalidation.test(entry);
     }
   }
 
@@ -302,7 +232,7 @@ public class PersistentCache {
   private byte[] getCache(String key) throws IOException {
     Path cachePath = getCacheEntryPath(key);
 
-    if (!validateCacheEntry(cachePath, this.defaultDurationToExpireMs)) {
+    if (!validateCacheEntry(cachePath)) {
       return null;
     }
 
@@ -312,7 +242,7 @@ public class PersistentCache {
   private Path getCacheCopy(String key) throws IOException {
     Path cachePath = getCacheEntryPath(key);
 
-    if (!validateCacheEntry(cachePath, this.defaultDurationToExpireMs)) {
+    if (!validateCacheEntry(cachePath)) {
       return null;
     }
 
@@ -321,34 +251,13 @@ public class PersistentCache {
     return temp;
   }
 
-  private static class DeleteOnCloseInputStream extends InputStream {
-    private final InputStream stream;
-    private final Path p;
-
-    private DeleteOnCloseInputStream(InputStream stream, Path p) {
-      this.stream = stream;
-      this.p = p;
-    }
-
-    @Override
-    public int read() throws IOException {
-      return stream.read();
-    }
-
-    @Override
-    public void close() throws IOException {
-      stream.close();
-      Files.delete(p);
-    }
-  }
-
-  private boolean validateCacheEntry(Path cacheEntryPath, long durationToExpireMs) throws IOException {
+  private boolean validateCacheEntry(Path cacheEntryPath) throws IOException {
     if (!Files.exists(cacheEntryPath)) {
       return false;
     }
 
-    if (isCacheEntryExpired(cacheEntryPath, durationToExpireMs)) {
-      logger.debug("cache: expiring entry");
+    if (invalidation.test(cacheEntryPath)) {
+      logger.debug("cache: evicting entry");
       Files.delete(cacheEntryPath);
       return false;
     }
@@ -356,25 +265,8 @@ public class PersistentCache {
     return true;
   }
 
-  private static boolean isCacheEntryExpired(Path cacheEntryPath, long durationToExpireMs) throws IOException {
-    BasicFileAttributes attr = Files.readAttributes(cacheEntryPath, BasicFileAttributes.class);
-    long modTime = attr.lastModifiedTime().toMillis();
-
-    long age = System.currentTimeMillis() - modTime;
-
-    if (age > durationToExpireMs) {
-      return true;
-    }
-
-    return false;
-  }
-
-  private Path getLockPath() {
-    return baseDir.resolve(LOCK_FNAME);
-  }
-
   private Path getCacheEntryPath(String key) {
-    return baseDir.resolve(key);
+    return dir.resolve(key);
   }
 
   public static String byteArrayToHex(byte[] bytes) {

@@ -35,6 +35,8 @@ import org.junit.rules.ExpectedException;
 import org.sonar.api.batch.AnalysisMode;
 import org.sonar.api.batch.bootstrap.ProjectDefinition;
 import org.sonar.api.batch.bootstrap.ProjectReactor;
+import org.sonar.api.utils.log.LogTester;
+import org.sonar.api.utils.log.LoggerLevel;
 import org.sonar.batch.analysis.AnalysisProperties;
 import org.sonar.test.TestUtils;
 
@@ -46,6 +48,9 @@ public class ProjectReactorBuilderTest {
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
+
+  @Rule
+  public LogTester logTester = new LogTester();
 
   private AnalysisMode mode;
 
@@ -63,8 +68,6 @@ public class ProjectReactorBuilderTest {
     assertThat(projectDefinition.getVersion()).isEqualTo("1.0-SNAPSHOT");
     assertThat(projectDefinition.getDescription()).isEqualTo("Description of Foo Project");
     assertThat(projectDefinition.getSourceDirs()).contains("sources");
-    assertThat(projectDefinition.getLibraries()).contains(TestUtils.getResource(this.getClass(), "simple-project/libs/lib2.txt").getAbsolutePath(),
-      TestUtils.getResource(this.getClass(), "simple-project/libs/lib2.txt").getAbsolutePath());
   }
 
   @Test
@@ -125,7 +128,6 @@ public class ProjectReactorBuilderTest {
     // root project must not contain some properties - even if they are defined in the root properties file
     assertThat(rootProject.getSourceDirs().contains("sources")).isFalse();
     assertThat(rootProject.getTestDirs().contains("tests")).isFalse();
-    assertThat(rootProject.getBinaries().contains("target/classes")).isFalse();
     // and module properties must have been cleaned
     assertThat(rootProject.properties().get("module1.sonar.projectKey")).isNull();
     assertThat(rootProject.properties().get("module2.sonar.projectKey")).isNull();
@@ -256,11 +258,6 @@ public class ProjectReactorBuilderTest {
   }
 
   @Test
-  public void shouldNotFailIfUnexistingTestBinLibFolderInheritedInMultimodule() {
-    loadProjectDefinition("multi-module-with-unexisting-test-bin-lib-dir");
-  }
-
-  @Test
   public void shouldFailIfExplicitUnexistingTestFolder() {
     thrown.expect(IllegalStateException.class);
     thrown.expectMessage("The folder 'tests' does not exist for 'com.foo.project' (base directory = "
@@ -270,57 +267,12 @@ public class ProjectReactorBuilderTest {
   }
 
   @Test
-  public void shouldFailIfExplicitUnexistingBinaryFolder() {
-    thrown.expect(IllegalStateException.class);
-    thrown.expectMessage("The folder 'bin' does not exist for 'com.foo.project' (base directory = "
-      + TestUtils.getResource(this.getClass(), "simple-project-with-unexisting-binary").getAbsolutePath());
-
-    loadProjectDefinition("simple-project-with-unexisting-binary");
-  }
-
-  @Test
-  public void shouldFailIfExplicitUnmatchingLibFolder() {
-    thrown.expect(IllegalStateException.class);
-    thrown.expectMessage("No files nor directories matching 'libs/*.txt' in directory "
-      + TestUtils.getResource(this.getClass(), "simple-project-with-unexisting-lib").getAbsolutePath());
-
-    loadProjectDefinition("simple-project-with-unexisting-lib");
-  }
-
-  @Test
-  public void shouldGetLibDirectory() {
-    ProjectDefinition def = loadProjectDefinition("simple-project-with-lib-dir");
-    assertThat(def.getLibraries()).hasSize(1);
-    File libDir = new File(def.getLibraries().get(0));
-    assertThat(libDir).isDirectory().exists();
-    assertThat(libDir.getName()).isEqualTo("lib");
-  }
-
-  @Test
   public void shouldFailIfExplicitUnexistingTestFolderOnModule() {
     thrown.expect(IllegalStateException.class);
     thrown.expectMessage("The folder 'tests' does not exist for 'module1' (base directory = "
       + TestUtils.getResource(this.getClass(), "multi-module-with-explicit-unexisting-test-dir").getAbsolutePath() + File.separator + "module1)");
 
     loadProjectDefinition("multi-module-with-explicit-unexisting-test-dir");
-  }
-
-  @Test
-  public void shouldFailIfExplicitUnexistingBinaryFolderOnModule() {
-    thrown.expect(IllegalStateException.class);
-    thrown.expectMessage("The folder 'bin' does not exist for 'module1' (base directory = "
-      + TestUtils.getResource(this.getClass(), "multi-module-with-explicit-unexisting-binary-dir").getAbsolutePath() + File.separator + "module1)");
-
-    loadProjectDefinition("multi-module-with-explicit-unexisting-binary-dir");
-  }
-
-  @Test
-  public void shouldFailIfExplicitUnmatchingLibFolderOnModule() {
-    thrown.expect(IllegalStateException.class);
-    thrown.expectMessage("No files nor directories matching 'lib/*.jar' in directory "
-      + TestUtils.getResource(this.getClass(), "multi-module-with-explicit-unexisting-lib").getAbsolutePath() + File.separator + "module1");
-
-    loadProjectDefinition("multi-module-with-explicit-unexisting-lib");
   }
 
   @Test
@@ -408,22 +360,6 @@ public class ProjectReactorBuilderTest {
     ProjectReactorBuilder.checkMandatoryProperties(props, new String[] {"foo1"});
 
     // No exception should be thrown
-  }
-
-  @Test
-  public void shouldFilterFiles() {
-    File baseDir = TestUtils.getResource(this.getClass(), "shouldFilterFiles");
-    assertThat(ProjectReactorBuilder.getLibraries(baseDir, "in*.txt")).hasSize(1);
-    assertThat(ProjectReactorBuilder.getLibraries(baseDir, "*.txt")).hasSize(2);
-    assertThat(ProjectReactorBuilder.getLibraries(baseDir.getParentFile(), "shouldFilterFiles/in*.txt")).hasSize(1);
-    assertThat(ProjectReactorBuilder.getLibraries(baseDir.getParentFile(), "shouldFilterFiles/*.txt")).hasSize(2);
-  }
-
-  @Test
-  public void shouldWorkWithAbsolutePath() {
-    File baseDir = new File("not-exists");
-    String absolutePattern = TestUtils.getResource(this.getClass(), "shouldFilterFiles").getAbsolutePath() + "/in*.txt";
-    assertThat(ProjectReactorBuilder.getLibraries(baseDir.getParentFile(), absolutePattern)).hasSize(1);
   }
 
   @Test
@@ -593,8 +529,16 @@ public class ProjectReactorBuilderTest {
   public void shouldGetList() {
     Map<String, String> props = new HashMap<>();
 
-    props.put("prop", "  foo  ,  bar  , \n\ntoto,tutu");
+    props.put("prop", "  foo  ,,  bar  , \n\ntoto,tutu");
     assertThat(ProjectReactorBuilder.getListFromProperty(props, "prop")).containsOnly("foo", "bar", "toto", "tutu");
+  }
+
+  @Test
+  public void shouldGetEmptyList() {
+    Map<String, String> props = new HashMap<>();
+
+    props.put("prop", "");
+    assertThat(ProjectReactorBuilder.getListFromProperty(props, "prop")).isEmpty();
   }
 
   @Test
@@ -626,7 +570,6 @@ public class ProjectReactorBuilderTest {
     // root project must not contain some properties - even if they are defined in the root properties file
     assertThat(rootProject.getSourceDirs().contains("sources")).isFalse();
     assertThat(rootProject.getTestDirs().contains("tests")).isFalse();
-    assertThat(rootProject.getBinaries().contains("target/classes")).isFalse();
     // and module properties must have been cleaned
     assertThat(rootProject.properties().get("module1.sonar.projectKey")).isNull();
     assertThat(rootProject.properties().get("module2.sonar.projectKey")).isNull();
@@ -678,6 +621,16 @@ public class ProjectReactorBuilderTest {
       .isEqualTo(TestUtils.getResource(this.getClass(), "multi-module-definitions-same-prefix/module1.feature"));
     assertThat(module1Feature.getWorkDir().getCanonicalFile())
       .isEqualTo(new File(TestUtils.getResource(this.getClass(), "multi-module-definitions-same-prefix"), ".sonar/com.foo.project_com.foo.project.module1.feature"));
+  }
+
+  @Test
+  public void should_log_a_warning_when_a_dropped_property_is_present() {
+    Map<String, String> props = loadProps("simple-project");
+    props.put("sonar.qualitygate", "somevalue");
+    AnalysisProperties bootstrapProps = new AnalysisProperties(props, null);
+    new ProjectReactorBuilder(bootstrapProps, mode).execute();
+
+    assertThat(logTester.logs(LoggerLevel.WARN)).containsOnly("Property 'sonar.qualitygate' is not supported any more. It will be ignored.");
   }
 
   private Map<String, String> loadPropsFromFile(String filePath) throws IOException {

@@ -22,7 +22,6 @@ package org.sonar.server.computation.issue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.sonar.api.utils.log.Loggers;
 import org.sonar.core.issue.DefaultIssue;
 import org.sonar.core.issue.tracking.Tracking;
 import org.sonar.server.computation.component.Component;
@@ -72,7 +71,7 @@ public class IntegrateIssuesVisitor extends TypeAwareVisitorAdapter {
       closeUnmatchedBaseIssues(component, tracking, cacheAppender);
       issueVisitors.afterComponent(component);
     } catch (Exception e) {
-      Loggers.get(getClass()).error(String.format("Fail to process issues of %s", component.getKey()), e);
+      throw new IllegalStateException(String.format("Fail to process issues of component '%s'", component.getKey()), e);
     } finally {
       cacheAppender.close();
     }

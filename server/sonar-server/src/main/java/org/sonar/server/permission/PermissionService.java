@@ -22,7 +22,6 @@ package org.sonar.server.permission;
 
 import java.util.List;
 import org.sonar.api.server.ServerSide;
-import org.sonar.api.web.UserRole;
 import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
@@ -30,7 +29,6 @@ import org.sonar.db.component.ComponentDto;
 import org.sonar.db.component.ResourceDto;
 import org.sonar.db.permission.PermissionRepository;
 import org.sonar.server.component.ComponentFinder;
-import org.sonar.server.exceptions.ForbiddenException;
 import org.sonar.server.issue.index.IssueAuthorizationIndexer;
 import org.sonar.server.user.UserSession;
 
@@ -62,18 +60,23 @@ public class PermissionService {
   public void applyDefaultPermissionTemplate(String componentKey) {
     DbSession session = dbClient.openSession(false);
     try {
-      ComponentDto component = componentFinder.getByKey(session, componentKey);
-      ResourceDto provisioned = dbClient.resourceDao().selectProvisionedProject(session, componentKey);
-      if (provisioned == null) {
-        checkProjectAdminPermission(componentKey);
-      } else {
-        userSession.checkGlobalPermission(GlobalPermissions.PROVISIONING);
-      }
-      permissionRepository.grantDefaultRoles(session, component.getId(), component.qualifier());
-      session.commit();
+      applyDefaultPermissionTemplate(session, componentKey);
     } finally {
       session.close();
     }
+    indexProjectPermissions();
+  }
+
+  public void applyDefaultPermissionTemplate(DbSession session, String componentKey) {
+    ComponentDto component = componentFinder.getByKey(session, componentKey);
+    ResourceDto provisioned = dbClient.resourceDao().selectProvisionedProject(session, componentKey);
+    if (provisioned == null) {
+      checkProjectAdminUserByComponentKey(userSession, componentKey);
+    } else {
+      userSession.checkGlobalPermission(GlobalPermissions.PROVISIONING);
+    }
+    permissionRepository.applyDefaultPermissionTemplate(session, component);
+    session.commit();
     indexProjectPermissions();
   }
 
@@ -99,12 +102,6 @@ public class PermissionService {
     }
 
     indexProjectPermissions();
-  }
-
-  private void checkProjectAdminPermission(String projectKey) {
-    if (!userSession.hasGlobalPermission(GlobalPermissions.SYSTEM_ADMIN) && !userSession.hasProjectPermission(UserRole.ADMIN, projectKey)) {
-      throw new ForbiddenException("Insufficient privileges");
-    }
   }
 
   private void indexProjectPermissions() {

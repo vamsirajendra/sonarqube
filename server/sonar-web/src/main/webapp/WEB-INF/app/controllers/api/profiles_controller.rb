@@ -81,32 +81,7 @@ class Api::ProfilesController < Api::ApiController
       format.text { render :text => text_not_supported }
     end
   end
-
-  # POST /api/profiles/destroy?language=<language>&name=<name>
-  def destroy
-    verify_post_request
-    access_denied unless has_role?(:profileadmin)
-    require_parameters :language, :name
-
-    call_backend do
-      profile = Internal.quality_profiles.profile(params[:name], params[:language])
-      not_found('Profile not found') unless profile
-      Internal.component(Java::OrgSonarServerQualityprofile::QProfileService.java_class).delete(profile.key)
-    end
-    render_success('Profile destroyed')
-  end
-
-  # POST /api/profiles/set_as_default?language=<language>&name=<name>
-  #
-  # Since v.3.3
-  def set_as_default
-    verify_post_request
-    profile = Internal.quality_profiles.profile(params[:name], params[:language])
-    not_found('Profile not found') unless profile
-    Internal.component(Java::OrgSonarServerQualityprofile::QProfileService.java_class).setDefault(profile.key)
-    render_success
-  end
-
+  
   # GET /api/profiles?language=<language>[&name=<name>]
   def index
     require_parameters :language
@@ -126,43 +101,6 @@ class Api::ProfilesController < Api::ApiController
       format.json { render :json => jsonp(to_json) }
       format.xml { render :xml => to_xml }
       format.text { render :text => text_not_supported }
-    end
-  end
-
-  # Backup a profile. If output format is xml, then backup is directly returned.
-  # GET /api/profiles/backup?language=<language>[&name=my_profile] -v
-  def backup
-    require_parameters :language
-
-    language = params[:language]
-    if (params[:name].blank?)
-      profile = Internal.qprofile_service.getDefault(language)
-    else
-      profile = Internal.quality_profiles.profile(params[:name], params[:language])
-    end
-
-    not_found('Profile not found') unless profile
-    backup = Internal.component(Java::OrgSonarServerQualityprofile::QProfileService.java_class).backup(profile.key)
-
-    respond_to do |format|
-      format.xml { render :xml => backup }
-      format.json { render :json => jsonp({:backup => backup}) }
-    end
-  end
-
-  # Restore a profile backup.
-  # curl -X POST -u admin:admin -F 'backup=<my>backup</my>' -v http://localhost:9000/api/profiles/restore
-  # curl -X POST -u admin:admin -F 'backup=@backup.xml' -v http://localhost:9000/api/profiles/restore
-  def restore
-    verify_post_request
-    require_parameters :backup
-
-    backup = Api::Utils.read_post_request_param(params[:backup])
-    Internal.component(Java::OrgSonarServerQualityprofile::QProfileService.java_class).restore(backup)
-
-    respond_to do |format|
-      #TODO format.json { render :json => jsonp(validation_result_to_json(result)), :status => 200 }
-      format.json { render :json => jsonp({}), :status => 200 }
     end
   end
 

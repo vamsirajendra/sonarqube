@@ -19,30 +19,28 @@
  */
 package org.sonar.batch.analysis;
 
+import org.picocontainer.injectors.ProviderAdapter;
+import org.sonar.api.batch.AnalysisMode;
+import org.sonar.batch.bootstrap.BatchWsClient;
 import org.sonar.batch.cache.WSLoader;
 import org.sonar.batch.cache.WSLoader.LoadStrategy;
-import org.picocontainer.injectors.ProviderAdapter;
-
-import java.util.Map;
-
-import org.sonar.batch.bootstrap.ServerClient;
 import org.sonar.home.cache.PersistentCache;
-import org.sonar.api.batch.AnalysisMode;
 
 public class AnalysisWSLoaderProvider extends ProviderAdapter {
+  static final String SONAR_USE_WS_CACHE = "sonar.useWsCache";
   private WSLoader wsLoader;
 
-  public WSLoader provide(AnalysisProperties props, AnalysisMode mode, PersistentCache cache, ServerClient client) {
+  public WSLoader provide(AnalysisMode mode, PersistentCache cache, BatchWsClient client, AnalysisProperties props) {
     if (wsLoader == null) {
       // recreate cache directory if needed for this analysis
       cache.reconfigure();
-      wsLoader = new WSLoader(getStrategy(props.properties(), mode), cache, client);
+      wsLoader = new WSLoader(getStrategy(mode, props), cache, client);
     }
     return wsLoader;
   }
 
-  private static LoadStrategy getStrategy(Map<String, String> props, AnalysisMode mode) {
-    if (mode.isIssues()) {
+  private static LoadStrategy getStrategy(AnalysisMode mode, AnalysisProperties props) {
+    if (mode.isIssues() && "true".equals(props.property(SONAR_USE_WS_CACHE))) {
       return LoadStrategy.CACHE_ONLY;
     }
 

@@ -20,23 +20,19 @@
 package org.sonar.batch.cpd;
 
 import com.google.common.collect.ImmutableList;
-
 import java.util.List;
-
-import org.sonar.batch.cpd.index.IndexFactory;
 
 public final class CpdComponents {
 
   private CpdComponents() {
   }
 
-  public static List all() {
+  public static List<Class<? extends Object>> all() {
     return ImmutableList.of(
       CpdSensor.class,
       CpdMappings.class,
-      IndexFactory.class,
-      JavaCpdEngine.class,
-      DefaultCpdEngine.class);
+      JavaCpdIndexer.class,
+      DefaultCpdIndexer.class);
   }
 
 }

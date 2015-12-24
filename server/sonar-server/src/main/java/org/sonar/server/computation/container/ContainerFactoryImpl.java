@@ -19,12 +19,14 @@
  */
 package org.sonar.server.computation.container;
 
+import javax.annotation.Nullable;
 import org.sonar.core.platform.ComponentContainer;
 import org.sonar.server.computation.queue.CeTask;
+import org.sonar.server.devcockpit.DevCockpitBridge;
 
 public class ContainerFactoryImpl implements ContainerFactory {
   @Override
-  public ComputeEngineContainer create(ComponentContainer parent, CeTask task) {
-    return new ComputeEngineContainerImpl(parent, new ReportComputeEngineContainerPopulator(task));
+  public ComputeEngineContainer create(ComponentContainer parent, CeTask task, @Nullable DevCockpitBridge devCockpitBridge) {
+    return new ComputeEngineContainerImpl(parent, new ReportComputeEngineContainerPopulator(task, devCockpitBridge));
   }
 }

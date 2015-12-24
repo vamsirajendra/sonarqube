@@ -19,7 +19,7 @@
  */
 package org.sonar.server.computation.component;
 
-public final class TreeRootHolderComponentProvider implements ComponentProvider {
+public final class TreeRootHolderComponentProvider extends AbstractComponentProvider {
   private final TreeRootHolder treeRootHolder;
   private TreeComponentProvider delegate;
 
@@ -28,20 +28,20 @@ public final class TreeRootHolderComponentProvider implements ComponentProvider 
   }
 
   @Override
-  public void init() {
+  protected void ensureInitializedImpl() {
     if (this.delegate == null) {
       this.delegate = new TreeComponentProvider(treeRootHolder.getRoot());
-      this.delegate.init();
+      this.delegate.ensureInitialized();
     }
   }
 
   @Override
-  public void reset() {
+  protected void resetImpl() {
     this.delegate = null;
   }
 
   @Override
-  public Component getByRef(int componentRef) {
+  protected Component getByRefImpl(int componentRef) {
     return delegate.getByRef(componentRef);
   }
 }

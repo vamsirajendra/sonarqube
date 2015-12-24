@@ -2,10 +2,10 @@ import $ from 'jquery';
 import _ from 'underscore';
 import Backbone from 'backbone';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/maintenance-main.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['maintenance-main'],
+  template: Template,
 
   events: {
     'click #start-migration': 'startMigration'
@@ -17,7 +17,7 @@ export default Marionette.ItemView.extend({
       type: 'GET',
       url: baseUrl + '/api/system/' + (this.options.setup ? 'db_migration_status' : 'status')
     };
-    setInterval(function () {
+    this.pollingInternal = setInterval(function () {
       that.refresh();
     }, 5000);
   },
@@ -27,10 +27,17 @@ export default Marionette.ItemView.extend({
     return Backbone.ajax(this.requestOptions).done(function (r) {
       that.model.set(r);
       that.render();
+      if (that.model.get('status') === 'UP' || that.model.get('state') === 'NO_MIGRATION') {
+        that.stopPolling();
+      }
       if (that.model.get('state') === 'MIGRATION_SUCCEEDED') {
         that.goHome();
       }
     });
+  },
+
+  stopPolling: function () {
+    clearInterval(this.pollingInternal);
   },
 
   startMigration: function () {
@@ -55,7 +62,9 @@ export default Marionette.ItemView.extend({
   },
 
   serializeData: function () {
-    return _.extend(this._super(), { setup: this.options.setup });
+    return _.extend(Marionette.ItemView.prototype.serializeData.apply(this, arguments), {
+      setup: this.options.setup
+    });
   }
 });
 

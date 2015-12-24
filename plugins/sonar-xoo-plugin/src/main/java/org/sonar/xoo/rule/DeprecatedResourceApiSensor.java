@@ -32,6 +32,7 @@ import org.sonar.api.scan.filesystem.ModuleFileSystem;
 import org.sonar.api.scan.filesystem.PathResolver;
 import org.sonar.xoo.Xoo;
 
+@SuppressWarnings("deprecation")
 public class DeprecatedResourceApiSensor implements Sensor {
 
   public static final String RULE_KEY = "DeprecatedResourceApi";
@@ -53,7 +54,7 @@ public class DeprecatedResourceApiSensor implements Sensor {
   @Override
   public void analyse(Project module, org.sonar.api.batch.SensorContext context) {
     createIssueOnDir(new Directory(""));
-    File src = module.getFileSystem().getSourceDirs().get(0);
+    File src = fileSystem.sourceDirs().get(0);
 
     for (File f : fileSystem.files(FileQuery.onMain().onLanguage(Xoo.KEY))) {
       String relativePathFromSourceDir = new PathResolver().relativePath(src, f);

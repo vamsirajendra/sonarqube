@@ -1,0 +1,30 @@
+{
+  "paging": {
+    "pageIndex": 1,
+    "pageSize": 100,
+    "total": 3
+  },
+  "components": [
+    {
+      "id": "AVHE6Jo2EplJjXTo0Rzw",
+      "key": "com.sonarsource:java-markdown:src/test/java/com/sonarsource/markdown/BasicMarkdownParser.java",
+      "name": "BasicMarkdownParser.java",
+      "qualifier": "UTS",
+      "path": "src/test/java/com/sonarsource/markdown/BasicMarkdownParser.java"
+    },
+    {
+      "id": "AVHE6Jo3EplJjXTo0Rzx",
+      "key": "com.sonarsource:java-markdown:src/test/java/com/sonarsource/markdown/BasicMarkdownParserTest.java",
+      "name": "BasicMarkdownParserTest.java",
+      "qualifier": "UTS",
+      "path": "src/test/java/com/sonarsource/markdown/BasicMarkdownParserTest.java"
+    },
+    {
+      "id": "AVHE6Jo1EplJjXTo0Rzj",
+      "key": "com.sonarsource:java-markdown:src/main/java/com/sonarsource/markdown",
+      "name": "src/main/java/com/sonarsource/markdown",
+      "qualifier": "DIR",
+      "path": "src/main/java/com/sonarsource/markdown"
+    }
+  ]
+}

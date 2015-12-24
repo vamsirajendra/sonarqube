@@ -38,7 +38,7 @@ import org.sonar.db.component.ComponentDto;
 import org.sonar.server.component.ComponentFinder;
 import org.sonar.server.issue.index.IssueDoc;
 import org.sonar.server.issue.index.IssueIndex;
-import org.sonar.server.plugins.MimeTypes;
+import org.sonarqube.ws.MediaTypes;
 import org.sonar.server.user.UserSession;
 
 import static com.google.common.collect.Maps.newHashMap;
@@ -63,6 +63,7 @@ public class IssuesAction implements BatchWsAction {
   public void define(WebService.NewController controller) {
     WebService.NewAction action = controller.createAction("issues")
       .setDescription("Return open issues")
+      .setResponseExample(getClass().getResource("issues-example.proto"))
       .setSince("5.1")
       .setInternal(true)
       .setHandler(this);
@@ -79,7 +80,7 @@ public class IssuesAction implements BatchWsAction {
     userSession.checkGlobalPermission(GlobalPermissions.PREVIEW_EXECUTION);
     final String moduleKey = request.mandatoryParam(PARAM_KEY);
 
-    response.stream().setMediaType(MimeTypes.PROTOBUF);
+    response.stream().setMediaType(MediaTypes.PROTOBUF);
     DbSession session = dbClient.openSession(false);
     try {
       ComponentDto component = componentFinder.getByKey(session, moduleKey);

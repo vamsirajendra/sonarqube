@@ -41,11 +41,9 @@ import org.sonar.api.batch.fs.TextPointer;
 import org.sonar.api.batch.fs.TextRange;
 import org.sonar.api.batch.fs.internal.DefaultInputDir;
 import org.sonar.api.batch.fs.internal.DefaultInputFile;
-import org.sonar.api.batch.sensor.duplication.Duplication;
 import org.sonar.api.batch.sensor.highlighting.TypeOfText;
-import org.sonar.api.issue.Issue;
-import org.sonar.batch.duplication.DuplicationCache;
 import org.sonar.batch.issue.IssueCache;
+import org.sonar.batch.issue.tracking.TrackedIssue;
 import org.sonar.batch.protocol.output.BatchReport;
 import org.sonar.batch.protocol.output.BatchReport.Component;
 import org.sonar.batch.protocol.output.BatchReport.Metadata;
@@ -55,15 +53,13 @@ import org.sonar.batch.report.BatchReportUtils;
 import org.sonar.batch.report.ReportPublisher;
 import org.sonar.batch.scan.ProjectScanContainer;
 import org.sonar.batch.scan.filesystem.InputPathCache;
-import org.sonar.core.issue.DefaultIssue;
 import org.sonar.core.util.CloseableIterator;
 
 public class TaskResult implements org.sonar.batch.mediumtest.ScanTaskObserver {
 
   private static final Logger LOG = LoggerFactory.getLogger(TaskResult.class);
 
-  private List<Issue> issues = new ArrayList<>();
-  private Map<String, List<Duplication>> duplications = new HashMap<>();
+  private List<TrackedIssue> issues = new ArrayList<>();
   private Map<String, InputFile> inputFiles = new HashMap<>();
   private Map<String, Component> reportComponents = new HashMap<>();
   private Map<String, InputDir> inputDirs = new HashMap<>();
@@ -72,7 +68,7 @@ public class TaskResult implements org.sonar.batch.mediumtest.ScanTaskObserver {
   @Override
   public void scanTaskCompleted(ProjectScanContainer container) {
     LOG.info("Store analysis results in memory for later assertions in medium test");
-    for (DefaultIssue issue : container.getComponentByType(IssueCache.class).all()) {
+    for (TrackedIssue issue : container.getComponentByType(IssueCache.class).all()) {
       issues.add(issue);
     }
 
@@ -86,7 +82,6 @@ public class TaskResult implements org.sonar.batch.mediumtest.ScanTaskObserver {
 
     storeFs(container);
 
-    storeDuplication(container);
   }
 
   private void storeReportComponents(int componentRef, String parentModuleKey, @Nullable String branch) {
@@ -106,13 +101,6 @@ public class TaskResult implements org.sonar.batch.mediumtest.ScanTaskObserver {
     return reader;
   }
 
-  private void storeDuplication(ProjectScanContainer container) {
-    DuplicationCache duplicationCache = container.getComponentByType(DuplicationCache.class);
-    for (String effectiveKey : duplicationCache.componentKeys()) {
-      duplications.put(effectiveKey, Lists.<Duplication>newArrayList(duplicationCache.byComponent(effectiveKey)));
-    }
-  }
-
   private void storeFs(ProjectScanContainer container) {
     InputPathCache inputFileCache = container.getComponentByType(InputPathCache.class);
     for (InputFile inputPath : inputFileCache.allFiles()) {
@@ -123,8 +111,12 @@ public class TaskResult implements org.sonar.batch.mediumtest.ScanTaskObserver {
     }
   }
 
-  public List<Issue> trackedIssues() {
+  public List<TrackedIssue> trackedIssues() {
     return issues;
+  }
+
+  public Component getReportComponent(String key) {
+    return reportComponents.get(key);
   }
 
   public List<BatchReport.Issue> issuesFor(InputPath inputPath) {
@@ -160,10 +152,6 @@ public class TaskResult implements org.sonar.batch.mediumtest.ScanTaskObserver {
   @CheckForNull
   public InputDir inputDir(String relativePath) {
     return inputDirs.get(relativePath);
-  }
-
-  public List<Duplication> duplicationsFor(InputFile inputFile) {
-    return duplications.get(((DefaultInputFile) inputFile).key());
   }
 
   public Map<String, List<BatchReport.Measure>> allMeasures() {
@@ -224,6 +212,32 @@ public class TaskResult implements org.sonar.batch.mediumtest.ScanTaskObserver {
       }
     }
     return Collections.emptyList();
+  }
+
+  public List<BatchReport.Duplication> duplicationsFor(InputFile file) {
+    List<BatchReport.Duplication> result = new ArrayList<>();
+    int ref = reportComponents.get(((DefaultInputFile) file).key()).getRef();
+    try (CloseableIterator<BatchReport.Duplication> it = getReportReader().readComponentDuplications(ref)) {
+      while (it.hasNext()) {
+        result.add(it.next());
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+    return result;
+  }
+
+  public List<BatchReport.CpdTextBlock> duplicationBlocksFor(InputFile file) {
+    List<BatchReport.CpdTextBlock> result = new ArrayList<>();
+    int ref = reportComponents.get(((DefaultInputFile) file).key()).getRef();
+    try (CloseableIterator<BatchReport.CpdTextBlock> it = getReportReader().readCpdTextBlocks(ref)) {
+      while (it.hasNext()) {
+        result.add(it.next());
+      }
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+    return result;
   }
 
   @CheckForNull

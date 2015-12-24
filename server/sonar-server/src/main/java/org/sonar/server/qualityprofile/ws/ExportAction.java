@@ -20,6 +20,11 @@
 package org.sonar.server.qualityprofile.ws;
 
 import com.google.common.collect.Lists;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.sonar.api.profiles.ProfileExporter;
 import org.sonar.api.resources.Language;
@@ -29,20 +34,15 @@ import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.Response.Stream;
 import org.sonar.api.server.ws.WebService;
 import org.sonar.api.server.ws.WebService.NewAction;
+import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.db.qualityprofile.QualityProfileDto;
-import org.sonar.db.DbClient;
+import org.sonar.server.component.ws.LanguageParamUtils;
 import org.sonar.server.exceptions.NotFoundException;
-import org.sonar.server.plugins.MimeTypes;
+import org.sonarqube.ws.MediaTypes;
 import org.sonar.server.qualityprofile.QProfileBackuper;
 import org.sonar.server.qualityprofile.QProfileExporters;
 import org.sonar.server.qualityprofile.QProfileFactory;
-
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 public class ExportAction implements QProfileWsAction {
 
@@ -70,16 +70,17 @@ public class ExportAction implements QProfileWsAction {
 
   @Override
   public void define(WebService.NewController controller) {
-    NewAction create = controller.createAction("export")
+    NewAction action = controller.createAction("export")
       .setSince("5.2")
       .setDescription("Export a quality profile.")
+      .setResponseExample(getClass().getResource("export-example.xml"))
       .setHandler(this);
 
-    create.createParam(PARAM_PROFILE_NAME)
+    action.createParam(PARAM_PROFILE_NAME)
       .setDescription("The name of the quality profile to export. If left empty, will export the default profile for the language.")
       .setExampleValue("My Sonar way");
 
-    create.createParam(PARAM_LANGUAGE)
+    action.createParam(PARAM_LANGUAGE)
       .setDescription("The language for the quality profile.")
       .setExampleValue(LanguageParamUtils.getExampleValue(languages))
       .setPossibleValues(LanguageParamUtils.getLanguageKeys(languages))
@@ -92,7 +93,7 @@ public class ExportAction implements QProfileWsAction {
       }
     }
     if (!exporterKeys.isEmpty()) {
-      create.createParam(PARAM_FORMAT)
+      action.createParam(PARAM_FORMAT)
         .setDescription("Output format. If left empty, the same format as api/qualityprofiles/backup is used. " +
           "Possible values are described by api/qualityprofiles/exporters.")
         .setPossibleValues(exporterKeys);
@@ -126,7 +127,7 @@ public class ExportAction implements QProfileWsAction {
 
       String profileKey = profile.getKey();
       if (format == null) {
-        stream.setMediaType(MimeTypes.XML);
+        stream.setMediaType(MediaTypes.XML);
         backuper.backup(profileKey, writer);
       } else {
         stream.setMediaType(exporters.mimeType(format));

@@ -57,6 +57,27 @@ public interface ComponentMapper {
 
   List<String> selectExistingUuids(@Param("uuids") Collection<String> uuids);
 
+  List<ComponentDto> selectComponentsByQualifiers(@Param("qualifiers") Collection<String> qualifiers);
+
+  List<ComponentDto> selectByQuery(@Param("query") ComponentQuery query, RowBounds rowBounds);
+
+  int countByQuery(@Param("query") ComponentQuery query);
+
+  /**
+   * Return direct children components
+   */
+  List<ComponentDto> selectDirectChildren(@Param("query") ComponentTreeQuery componentTreeQuery, RowBounds rowBounds);
+
+  int countDirectChildren(@Param("query") ComponentTreeQuery componentTreeQuery);
+
+  /**
+   * Return all children components.
+   */
+  List<ComponentDto> selectAllChildren(@Param("query") ComponentTreeQuery componentTreeQuery,
+                                       RowBounds rowBounds);
+
+  int countAllChildren(@Param("query") ComponentTreeQuery componentTreeQuery);
+
   /**
    * Return all project (PRJ/TRK) uuids
    */
@@ -77,7 +98,7 @@ public interface ComponentMapper {
    * Return all descendant modules (including itself) from a given component uuid and scope
    */
   List<ComponentDto> selectDescendantModules(@Param("moduleUuid") String moduleUuid, @Param(value = "scope") String scope,
-                                             @Param(value = "excludeDisabled") boolean excludeDisabled);
+    @Param(value = "excludeDisabled") boolean excludeDisabled);
 
   /**
    * Return all files from a given project uuid and scope
@@ -88,7 +109,7 @@ public interface ComponentMapper {
    * Return all descendant files from a given module uuid and scope
    */
   List<FilePathWithHashDto> selectDescendantFiles(@Param("moduleUuid") String moduleUuid, @Param(value = "scope") String scope,
-                                                  @Param(value = "excludeDisabled") boolean excludeDisabled);
+    @Param(value = "excludeDisabled") boolean excludeDisabled);
 
   /**
    * Return uuids and project uuids from list of qualifiers
@@ -103,7 +124,7 @@ public interface ComponentMapper {
    * @param scope scope of components to return. If null, all components are returned
    */
   List<ComponentDto> selectComponentsFromProjectKeyAndScope(@Param("projectKey") String projectKey, @Nullable @Param("scope") String scope,
-                                                            @Param(value = "excludeDisabled") boolean excludeDisabled);
+    @Param(value = "excludeDisabled") boolean excludeDisabled);
 
   /**
    * Return technical projects from a view or a sub-view
@@ -127,5 +148,4 @@ public interface ComponentMapper {
   void update(ComponentDto componentDto);
 
   void delete(long componentId);
-
 }

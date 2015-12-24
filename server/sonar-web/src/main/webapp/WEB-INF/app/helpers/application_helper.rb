@@ -208,7 +208,7 @@ module ApplicationHelper
       if options[:period] && @snapshot
         snapshot_datetime = @snapshot.period_datetime(options[:period])
         if snapshot_datetime
-          date = snapshot_datetime.to_date
+          date = snapshot_datetime.strftime('%FT%T%z')
           url += "createdAfter=#{date}|"
         end
       end
@@ -235,7 +235,11 @@ module ApplicationHelper
           url += 'resolved=false'
       end
     else
-      url = url_for(options.merge({:controller => 'drilldown', :action => 'measures', :metric => metric_key, :id => options[:resource]||@resource.id}))
+      if metric_key == 'new_sqale_debt_ratio'
+        url = url_for(options.merge({:controller => 'drilldown', :action => 'measures', :metric => 'new_technical_debt', :highlight => 'new_sqale_debt_ratio', :id => options[:resource]||@resource.id}))
+      else
+        url = url_for(options.merge({:controller => 'drilldown', :action => 'measures', :metric => metric_key, :id => options[:resource]||@resource.id}))
+      end
     end
 
     url
@@ -1024,7 +1028,7 @@ module ApplicationHelper
 
 
   def get_issue_metrics
-    ['violations',
+    ['violations', 'new_violations',
      'blocker_violations', 'critical_violations', 'major_violations', 'minor_violations', 'info_violations',
      'new_blocker_violations', 'new_critical_violations', 'new_major_violations', 'new_minor_violations', 'new_info_violations',
      'open_issues', 'reopened_issues', 'confirmed_issues', 'false_positive_issues']

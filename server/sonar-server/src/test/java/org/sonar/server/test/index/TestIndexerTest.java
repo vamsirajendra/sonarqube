@@ -40,7 +40,6 @@ import org.sonar.api.config.Settings;
 import org.sonar.api.utils.System2;
 import org.sonar.db.DbTester;
 import org.sonar.db.protobuf.DbFileSources;
-import org.sonar.server.db.DbClient;
 import org.sonar.server.es.EsTester;
 import org.sonar.server.source.index.FileSourcesUpdaterHelper;
 import org.sonar.server.test.db.TestTesting;
@@ -75,7 +74,7 @@ public class TestIndexerTest {
   public void setUp() {
     es.truncateIndices();
     db.truncateTables();
-    underTest = new TestIndexer(new DbClient(db.database(), db.myBatis()), es.client());
+    underTest = new TestIndexer(db.getDbClient(), es.client());
     underTest.setEnabled(true);
   }
 
@@ -170,6 +169,10 @@ public class TestIndexerTest {
     indexTest("P1", "F1", "T2", "U112");
     indexTest("P1", "F2", "T1", "U121");
     indexTest("P2", "F3", "T1", "U231");
+
+    for (SearchHit hit : getDocuments()) {
+      System.out.println("BEFORE " + hit.getSourceAsString());
+    }
 
     underTest.deleteByProject("P1");
 

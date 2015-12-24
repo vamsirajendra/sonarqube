@@ -1,22 +1,23 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import IssueView from 'components/issue/issue-view';
+import IssueView from '../../components/issue/issue-view';
 import IssueFilterView from './issue-filter-view';
-import './templates';
+import CheckboxTemplate from './templates/issues-issue-checkbox.hbs';
+import FilterTemplate from './templates/issues-issue-filter.hbs';
 
 var SHOULD_NULL = {
-      any: ['issues'],
-      resolutions: ['resolved'],
-      resolved: ['resolutions'],
-      assignees: ['assigned'],
-      assigned: ['assignees'],
-      actionPlans: ['planned'],
-      planned: ['actionPlans']
-    };
+  any: ['issues'],
+  resolutions: ['resolved'],
+  resolved: ['resolutions'],
+  assignees: ['assigned'],
+  assigned: ['assignees'],
+  actionPlans: ['planned'],
+  planned: ['actionPlans']
+};
 
 export default IssueView.extend({
-  checkboxTemplate: Templates['issues-issue-checkbox'],
-  filterTemplate: Templates['issues-issue-filter'],
+  checkboxTemplate: CheckboxTemplate,
+  filterTemplate: FilterTemplate,
 
   events: function () {
     return _.extend(IssueView.prototype.events.apply(this, arguments), {
@@ -130,5 +131,3 @@ export default IssueView.extend({
     });
   }
 });
-
-

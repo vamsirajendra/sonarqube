@@ -29,9 +29,9 @@ import org.apache.commons.lang.ArrayUtils;
 import org.apache.ibatis.session.ResultContext;
 import org.apache.ibatis.session.ResultHandler;
 import org.apache.ibatis.session.SqlSession;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.sonar.api.utils.System2;
+import org.sonar.api.utils.log.Logger;
+import org.sonar.api.utils.log.Loggers;
 import org.sonar.db.Dao;
 import org.sonar.db.DbSession;
 import org.sonar.db.MyBatis;
@@ -44,7 +44,7 @@ import static org.sonar.api.utils.DateUtils.dateToLong;
  * @since 2.14
  */
 public class PurgeDao implements Dao {
-  private static final Logger LOG = LoggerFactory.getLogger(PurgeDao.class);
+  private static final Logger LOG = Loggers.get(PurgeDao.class);
   private final MyBatis mybatis;
   private final ResourceDao resourceDao;
   private final System2 system2;
@@ -173,17 +173,14 @@ public class PurgeDao implements Dao {
     PurgeProfiler profiler = new PurgeProfiler();
     PurgeCommands purgeCommands = new PurgeCommands(session, profiler);
     deleteProject(uuid, mapper(session), purgeCommands);
-    deleteFileSources(uuid, purgeCommands);
     return this;
-  }
-
-  private static void deleteFileSources(String rootUuid, PurgeCommands commands) {
-    commands.deleteFileSources(rootUuid);
   }
 
   private static void deleteProject(String rootUuid, PurgeMapper mapper, PurgeCommands commands) {
     List<IdUuidPair> childrenIds = mapper.selectComponentsByProjectUuid(rootUuid);
-    commands.deleteResources(childrenIds);
+    commands.deleteComponents(childrenIds);
+    commands.deleteFileSources(rootUuid);
+    commands.deleteCeActivity(rootUuid);
   }
 
   private void disableResource(IdUuidPair componentIdUuid, PurgeMapper mapper) {

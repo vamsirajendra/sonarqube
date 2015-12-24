@@ -19,30 +19,51 @@
  */
 package org.sonar.batch.repository;
 
-import org.sonar.batch.protocol.input.QProfile;
-
-import java.util.Collection;
-
-import org.sonar.api.batch.AnalysisMode;
-import org.sonar.batch.analysis.AnalysisProperties;
-import org.sonar.api.batch.bootstrap.ProjectReactor;
-import org.sonar.batch.rule.ModuleQProfiles;
+import java.util.List;
+import javax.annotation.CheckForNull;
+import org.apache.commons.lang.mutable.MutableBoolean;
 import org.picocontainer.injectors.ProviderAdapter;
+import org.sonar.api.batch.bootstrap.ProjectKey;
+import org.sonar.api.utils.log.Logger;
+import org.sonar.api.utils.log.Loggers;
+import org.sonar.api.utils.log.Profiler;
+import org.sonar.batch.analysis.AnalysisProperties;
+import org.sonar.batch.analysis.DefaultAnalysisMode;
+import org.sonar.batch.rule.ModuleQProfiles;
+import org.sonarqube.ws.QualityProfiles.SearchWsResponse.QualityProfile;
 
 public class QualityProfileProvider extends ProviderAdapter {
+  private static final Logger LOG = Loggers.get(QualityProfileProvider.class);
+  private static final String LOG_MSG = "Load quality profiles";
   private ModuleQProfiles profiles = null;
 
-  public ModuleQProfiles provide(ProjectReactor projectReactor, QualityProfileLoader loader, AnalysisProperties props, AnalysisMode mode) {
+  public ModuleQProfiles provide(ProjectKey projectKey, QualityProfileLoader loader, ProjectRepositories projectRepositories, AnalysisProperties props, DefaultAnalysisMode mode) {
     if (this.profiles == null) {
-      String profile = null;
-      if (!mode.isIssues()) {
-        profile = props.property(ModuleQProfiles.SONAR_PROFILE_PROP);
+      List<QualityProfile> profileList;
+      MutableBoolean fromCache = new MutableBoolean();
+
+      Profiler profiler = Profiler.create(LOG).startInfo(LOG_MSG);
+      if (mode.isNotAssociated() || !projectRepositories.exists()) {
+        profileList = loader.loadDefault(getSonarProfile(props, mode), fromCache);
+      } else {
+        profileList = loader.load(projectKey.get(), getSonarProfile(props, mode), fromCache);
       }
-      Collection<QProfile> qps = loader.load(projectReactor.getRoot().getKeyWithBranch(), profile);
-      profiles = new ModuleQProfiles(qps);
+      profiler.stopInfo(fromCache.booleanValue());
+      profiles = new ModuleQProfiles(profileList);
     }
 
     return profiles;
+  }
+
+  @CheckForNull
+  private static String getSonarProfile(AnalysisProperties props, DefaultAnalysisMode mode) {
+    String profile = null;
+    if (!mode.isIssues() && props.properties().containsKey(ModuleQProfiles.SONAR_PROFILE_PROP)) {
+      profile = props.property(ModuleQProfiles.SONAR_PROFILE_PROP);
+      LOG.warn("Ability to set quality profile from command line using '" + ModuleQProfiles.SONAR_PROFILE_PROP
+        + "' is deprecated and will be dropped in a future SonarQube version. Please configure quality profile used by your project on SonarQube server.");
+    }
+    return profile;
   }
 
 }

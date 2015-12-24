@@ -7,6 +7,7 @@
     pm.metric_id as metricId,
     pm.rule_id as ruleId,
     pm.characteristic_id as characteristicId,
+    pm.person_id as developerId,
     pm.snapshot_id as snapshotId,
     pm.value as value,
     pm.text_value as textValue,
@@ -75,6 +76,38 @@
     </where>
   </select>
 
+  <select id="selectByDeveloperForSnapshotAndMetrics" parameterType="map" resultType="Measure">
+    SELECT
+    <include refid="measureColumns"/>
+    FROM project_measures pm
+    <where>
+      pm.snapshot_id = #{snapshotId}
+      AND pm.rule_id is NULL
+      AND pm.characteristic_id is NULL
+      AND pm.person_id = #{developerId}
+      AND
+      <foreach item="metricId" index="index" collection="metricIds" open="(" separator=" or " close=")">
+        pm.metric_id=#{metricId}
+      </foreach>
+    </where>
+  </select>
+
+  <select id="selectBySnapshotAndMetrics" parameterType="map" resultType="Measure">
+    SELECT
+    <include refid="measureColumns"/>
+    FROM project_measures pm
+    <where>
+      pm.snapshot_id = #{snapshotId}
+      AND pm.rule_id is NULL
+      AND pm.characteristic_id is NULL
+      AND pm.person_id is NULL
+      AND
+      <foreach item="metricId" index="index" collection="metricIds" open="(" separator=" or " close=")">
+        pm.metric_id=#{metricId}
+      </foreach>
+    </where>
+  </select>
+
   <select id="countByComponentAndMetric" parameterType="map" resultType="long">
     SELECT count(pm.id)
     FROM project_measures pm
@@ -118,7 +151,7 @@
     #{ruleId, jdbcType=INTEGER}, #{textValue, jdbcType=VARCHAR},
     #{componentId, jdbcType=INTEGER}, #{alertStatus, jdbcType=VARCHAR}, #{alertText, jdbcType=VARCHAR},
     #{description, jdbcType=VARCHAR}, #{characteristicId, jdbcType=INTEGER},
-    #{personId, jdbcType=INTEGER}, #{variation1, jdbcType=DOUBLE}, #{variation2, jdbcType=DOUBLE},
+    #{developerId, jdbcType=INTEGER}, #{variation1, jdbcType=DOUBLE}, #{variation2, jdbcType=DOUBLE},
     #{variation3, jdbcType=DOUBLE},
     #{variation4, jdbcType=DOUBLE}, #{variation5, jdbcType=DOUBLE}, #{dataValue, jdbcType=BINARY}
     )

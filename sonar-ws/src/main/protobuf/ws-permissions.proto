@@ -28,7 +28,7 @@ option optimize_for = SPEED;
 
 // WS api/permissions/users for internal use only
 // and WS api/permissions/template_users for internal use only
-message WsUsersResponse {
+message UsersWsResponse {
   optional sonarqube.ws.commons.Paging paging = 1;
   repeated User users = 2;
 }
@@ -44,7 +44,7 @@ message WsSearchGlobalPermissionsResponse {
   repeated Permission permissions = 1;
 }
 
-message WsSearchProjectPermissionsResponse {
+message SearchProjectPermissionsWsResponse {
   message Project {
     optional string id = 1;
     optional string key = 2;
@@ -58,15 +58,15 @@ message WsSearchProjectPermissionsResponse {
   repeated Permission permissions = 3;
 }
 
-message WsCreatePermissionTemplateResponse {
+message CreateTemplateWsResponse {
   optional PermissionTemplate permissionTemplate = 1;
 }
 
-message WsUpdatePermissionTemplateResponse {
+message UpdateTemplateWsResponse {
   optional PermissionTemplate permissionTemplate = 1;
 }
 
-message WsSearchTemplatesResponse {
+message SearchTemplatesWsResponse {
   message TemplateIdQualifier {
     optional string templateId = 1;
     optional string qualifier = 2;

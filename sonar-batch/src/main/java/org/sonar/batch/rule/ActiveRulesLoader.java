@@ -19,10 +19,12 @@
  */
 package org.sonar.batch.rule;
 
-import org.sonar.batch.protocol.input.ActiveRule;
+import org.apache.commons.lang.mutable.MutableBoolean;
 
-import java.util.Collection;
+import javax.annotation.Nullable;
+
+import java.util.List;
 
 public interface ActiveRulesLoader {
-  Collection<ActiveRule> load(Collection<String> qualityProfileKeys, String projectKey);
+  List<LoadedActiveRule> load(String qualityProfileKey, @Nullable MutableBoolean fromCache);
 }

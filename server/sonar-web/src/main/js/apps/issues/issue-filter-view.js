@@ -1,20 +1,20 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import ActionOptionsView from 'components/common/action-options-view';
-import './templates';
+import ActionOptionsView from '../../components/common/action-options-view';
+import Template from './templates/issues-issue-filter-form.hbs';
 
 export default ActionOptionsView.extend({
-  template: Templates['issues-issue-filter-form'],
+  template: Template,
 
   selectOption: function (e) {
     var property = $(e.currentTarget).data('property'),
         value = $(e.currentTarget).data('value');
     this.trigger('select', property, value);
-    this._super(e);
+    ActionOptionsView.prototype.selectOption.apply(this, arguments);
   },
 
   serializeData: function () {
-    return _.extend(this._super(), {
+    return _.extend(ActionOptionsView.prototype.serializeData.apply(this, arguments), {
       s: this.model.get('severity')
     });
   }

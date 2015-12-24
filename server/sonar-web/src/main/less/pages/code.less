@@ -1,0 +1,58 @@
+@import (reference) "../mixins";
+@import (reference) "../variables";
+@import (reference) "../init/type";
+
+
+.code-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.code-breadcrumbs > li {
+  padding: 5px 5px 3px;
+}
+
+.code-breadcrumbs > li:first-child {
+  padding-left: 0;
+}
+
+.code-breadcrumbs > li::after {
+  position: relative;
+  top: -1px;
+  padding-left: 10px;
+  color: @secondFontColor;
+  font-size: 11px;
+  content: ">";
+}
+
+.code-breadcrumbs > li:last-child::after {
+  display: none;
+}
+
+.code-components-cell {
+  width: 100px;
+}
+
+.code-truncated {
+  display: inline-block;
+  vertical-align: text-top;
+  max-width: 300px;
+  .text-ellipsis;
+}
+
+.code-name-cell {
+  max-width: 0;
+}
+
+.code-name-cell .code-truncated {
+  max-width: 100%;
+}
+
+.code-source-viewer .source-viewer-header-component {
+  visibility: hidden;
+}
+
+.code-search-box {
+  padding-left: 10px;
+  overflow: hidden;
+}

@@ -98,6 +98,12 @@ public class BatchReportWriter {
     return file;
   }
 
+  public File writeCpdTextBlocks(int componentRef, Iterable<BatchReport.CpdTextBlock> blocks) {
+    File file = fileStructure.fileFor(FileStructure.Domain.CPD_TEXT_BLOCKS, componentRef);
+    Protobuf.writeStream(blocks, file, false);
+    return file;
+  }
+
   public File writeComponentSymbols(int componentRef, Iterable<BatchReport.Symbol> symbols) {
     File file = fileStructure.fileFor(FileStructure.Domain.SYMBOLS, componentRef);
     Protobuf.writeStream(symbols, file, false);

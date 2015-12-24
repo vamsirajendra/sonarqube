@@ -10,7 +10,8 @@ import Controller from './controller';
 
 var App = new Marionette.Application();
 
-var init = function (options) {
+var init = function () {
+  let options = window.sonarqube;
   // Layout
   this.layout = new Layout({ el: options.el });
   this.layout.render();
@@ -52,11 +53,11 @@ var appXHR = $.get(baseUrl + '/api/qualitygates/app')
     });
 
 App.on('start', function (options) {
-  $.when(window.requestMessages(), appXHR).done(function () {
+  appXHR.done(function () {
     init.call(App, options);
   });
 });
 
-export default App;
+window.sonarqube.appStarted.then(options => App.start(options));
 
 

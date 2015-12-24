@@ -17,6 +17,7 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
+include ERB::Util
 class DashboardController < ApplicationController
 
   SECTION=Navigation::SECTION_RESOURCE
@@ -26,7 +27,20 @@ class DashboardController < ApplicationController
   def index
     load_resource()
       if !@resource || @resource.display_dashboard?
-        redirect_if_bad_component()
+        if params[:id]
+          unless @resource
+            return project_not_found
+          end
+          unless @snapshot
+            return project_not_analyzed
+          end
+        end
+
+        # redirect to the project overview
+        if params[:id] && !params[:did] && !params[:name] && @resource.qualifier != 'DEV'
+          return redirect_to(url_for({:controller => 'overview'}) + '?id=' + url_encode(params[:id]))
+        end
+
         load_dashboard()
         load_authorized_widget_definitions()
       else

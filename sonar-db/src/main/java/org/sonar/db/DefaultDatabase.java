@@ -36,7 +36,11 @@ import org.sonar.api.utils.log.Logger;
 import org.sonar.api.utils.log.Loggers;
 import org.sonar.db.dialect.Dialect;
 import org.sonar.db.dialect.DialectUtils;
+import org.sonar.db.profiling.NullConnectionInterceptor;
+import org.sonar.db.profiling.ProfiledConnectionInterceptor;
 import org.sonar.db.profiling.ProfiledDataSource;
+
+import static java.lang.String.format;
 
 /**
  * @since 2.12
@@ -51,7 +55,7 @@ public class DefaultDatabase implements Database {
   private static final String SONAR_JDBC_URL = "sonar.jdbc.url";
 
   private Settings settings;
-  private BasicDataSource datasource;
+  private ProfiledDataSource datasource;
   private Dialect dialect;
   private Properties properties;
 
@@ -63,7 +67,7 @@ public class DefaultDatabase implements Database {
   public void start() {
     try {
       initSettings();
-      initDatasource();
+      initDataSource();
       checkConnection();
 
     } catch (Exception e) {
@@ -75,22 +79,21 @@ public class DefaultDatabase implements Database {
   void initSettings() {
     properties = new Properties();
     completeProperties(settings, properties, SONAR_JDBC);
-    completeDefaultProperties(properties);
+    completeDefaultProperty(properties, DatabaseProperties.PROP_URL, DEFAULT_URL);
     doCompleteProperties(properties);
 
     dialect = DialectUtils.find(properties.getProperty(SONAR_JDBC_DIALECT), properties.getProperty(SONAR_JDBC_URL));
     properties.setProperty(DatabaseProperties.PROP_DRIVER, dialect.getDefaultDriverClassName());
   }
 
-  private void initDatasource() throws Exception {// NOSONAR this exception is thrown by BasicDataSourceFactory
+  private void initDataSource() throws Exception {
     // but it's correctly caught by start()
-    LOG.info("Create JDBC datasource for " + properties.getProperty(DatabaseProperties.PROP_URL, DEFAULT_URL));
-    datasource = (BasicDataSource) BasicDataSourceFactory.createDataSource(extractCommonsDbcpProperties(properties));
+    LOG.info("Create JDBC data source for {}", properties.getProperty(DatabaseProperties.PROP_URL, DEFAULT_URL));
+    BasicDataSource basicDataSource = (BasicDataSource) BasicDataSourceFactory.createDataSource(extractCommonsDbcpProperties(properties));
+    datasource = new ProfiledDataSource(basicDataSource, NullConnectionInterceptor.INSTANCE);
     datasource.setConnectionInitSqls(dialect.getConnectionInitStatements());
     datasource.setValidationQuery(dialect.getValidationQuery());
-    if ("TRACE".equals(settings.getString("sonar.log.level"))) {
-      datasource = new ProfiledDataSource(datasource);
-    }
+    enableSqlLogging(datasource, "TRACE".equals(settings.getString("sonar.log.level")));
   }
 
   private void checkConnection() {
@@ -129,6 +132,15 @@ public class DefaultDatabase implements Database {
     return properties;
   }
 
+  @Override
+  public void enableSqlLogging(boolean enable) {
+    enableSqlLogging(datasource, enable);
+  }
+
+  private static void enableSqlLogging(ProfiledDataSource ds, boolean enable) {
+    ds.setConnectionInterceptor(enable ? ProfiledConnectionInterceptor.INSTANCE : NullConnectionInterceptor.INSTANCE);
+  }
+
   /**
    * Override this method to add JDBC properties at runtime
    */
@@ -160,14 +172,6 @@ public class DefaultDatabase implements Database {
     return result;
   }
 
-  private static void completeDefaultProperties(Properties props) {
-    completeDefaultProperty(props, DatabaseProperties.PROP_URL, DEFAULT_URL);
-
-    if (props.getProperty(DatabaseProperties.PROP_USER_DEPRECATED) != null) {
-      completeDefaultProperty(props, DatabaseProperties.PROP_USER, props.getProperty(DatabaseProperties.PROP_USER_DEPRECATED));
-    }
-  }
-
   private static void completeDefaultProperty(Properties props, String key, String defaultValue) {
     if (props.getProperty(key) == null) {
       props.setProperty(key, defaultValue);
@@ -176,6 +180,6 @@ public class DefaultDatabase implements Database {
 
   @Override
   public String toString() {
-    return "Database[" + (properties != null ? properties.getProperty(SONAR_JDBC_URL) : "?") + "]";
+    return format("Database[%s]", properties != null ? properties.getProperty(SONAR_JDBC_URL) : "?");
   }
 }

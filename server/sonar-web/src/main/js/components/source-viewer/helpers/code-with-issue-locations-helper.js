@@ -113,15 +113,6 @@ function doTheStuff (code, issueLocations, optionalClassName) {
 }
 
 
-if (typeof Handlebars !== 'undefined') {
-  /**
-   * Handlebars helper to highlight issue locations in the source code
-   */
-  Handlebars.registerHelper('codeWithIssueLocations', function (code, issueLocations) {
-    return doTheStuff(code, issueLocations);
-  });
-}
-
 export default doTheStuff;
 
 

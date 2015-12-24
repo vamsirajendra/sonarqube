@@ -21,19 +21,22 @@ package org.sonar.server.computation.step;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
-import java.util.Date;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.sonar.batch.protocol.output.BatchReport;
 import org.sonar.core.component.ComponentKeys;
 import org.sonar.db.DbClient;
+import org.sonar.db.DbSession;
+import org.sonar.db.component.SnapshotDto;
+import org.sonar.db.component.SnapshotQuery;
 import org.sonar.server.computation.analysis.MutableAnalysisMetadataHolder;
 import org.sonar.server.computation.batch.BatchReportReader;
 import org.sonar.server.computation.component.Component;
 import org.sonar.server.computation.component.ComponentImpl;
 import org.sonar.server.computation.component.MutableTreeRootHolder;
 import org.sonar.server.computation.component.UuidFactory;
+import org.sonar.server.computation.snapshot.Snapshot;
 
 import static com.google.common.collect.Iterables.toArray;
 import static org.sonar.server.computation.component.ComponentImpl.builder;
@@ -57,12 +60,34 @@ public class BuildComponentTreeStep implements ComputationStep {
 
   @Override
   public void execute() {
-    analysisMetadataHolder.setAnalysisDate(new Date(reportReader.readMetadata().getAnalysisDate()));
-    BatchReport.Metadata reportMetadata = reportReader.readMetadata();
-    String branch = reportMetadata.hasBranch() ? reportMetadata.getBranch() : null;
-    BatchReport.Component reportProject = reportReader.readComponent(reportMetadata.getRootComponentRef());
+    String branch = analysisMetadataHolder.getBranch();
+    BatchReport.Component reportProject = reportReader.readComponent(analysisMetadataHolder.getRootComponentRef());
     UuidFactory uuidFactory = new UuidFactory(dbClient, moduleKey(reportProject, branch));
-    treeRootHolder.setRoot(new ComponentRootBuilder(reportProject, uuidFactory, branch).build());
+    Component project = new ComponentRootBuilder(reportProject, uuidFactory, branch).build();
+    treeRootHolder.setRoot(project);
+    setBaseProjectSnapshot(project.getUuid());
+  }
+
+  private void setBaseProjectSnapshot(String projectUuid) {
+    DbSession dbSession = dbClient.openSession(false);
+    try {
+      SnapshotDto snapshotDto = dbClient.snapshotDao().selectSnapshotByQuery(dbSession,
+        new SnapshotQuery()
+          .setComponentUuid(projectUuid)
+          .setIsLast(true));
+      analysisMetadataHolder.setBaseProjectSnapshot(toSnapshot(snapshotDto));
+    } finally {
+      dbClient.closeSession(dbSession);
+    }
+  }
+
+  @CheckForNull
+  private static Snapshot toSnapshot(@Nullable SnapshotDto snapshotDto) {
+    return snapshotDto == null ? null :
+      new Snapshot.Builder()
+        .setId(snapshotDto.getId())
+        .setCreatedAt(snapshotDto.getCreatedAt())
+        .build();
   }
 
   private class ComponentRootBuilder {
@@ -98,7 +123,7 @@ public class BuildComponentTreeStep implements ComputationStep {
       }
     }
 
-    private ComponentImpl buildComponent(BatchReport.Component reportComponent, String componentKey, String latestModuleKey){
+    private ComponentImpl buildComponent(BatchReport.Component reportComponent, String componentKey, String latestModuleKey) {
       return builder(reportComponent)
         .addChildren(toArray(buildChildren(reportComponent, latestModuleKey), Component.class))
         .setKey(componentKey)
@@ -115,7 +140,7 @@ public class BuildComponentTreeStep implements ComputationStep {
             return buildComponent(reportReader.readComponent(componentRef), latestModuleKey);
           }
         }
-      );
+        );
     }
   }
 

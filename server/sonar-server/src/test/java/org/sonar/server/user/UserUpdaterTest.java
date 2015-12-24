@@ -23,31 +23,30 @@ package org.sonar.server.user;
 import com.google.common.base.Strings;
 import java.util.List;
 import org.elasticsearch.search.SearchHit;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.mockito.ArgumentCaptor;
-import org.sonar.api.CoreProperties;
 import org.sonar.api.config.Settings;
 import org.sonar.api.platform.NewUserHandler;
 import org.sonar.api.utils.System2;
 import org.sonar.db.DbSession;
 import org.sonar.db.DbTester;
+import org.sonar.db.user.GroupDao;
 import org.sonar.db.user.GroupDto;
 import org.sonar.db.user.GroupMembershipDao;
 import org.sonar.db.user.GroupMembershipQuery;
+import org.sonar.db.user.UserDao;
 import org.sonar.db.user.UserDto;
 import org.sonar.db.user.UserGroupDao;
+import org.sonar.db.user.UserTokenDao;
 import org.sonar.server.db.DbClient;
 import org.sonar.server.es.EsTester;
 import org.sonar.server.exceptions.BadRequestException;
 import org.sonar.server.exceptions.Message;
 import org.sonar.server.exceptions.ServerException;
-import org.sonar.db.user.GroupDao;
-import org.sonar.db.user.UserDao;
 import org.sonar.server.user.index.UserIndexDefinition;
 import org.sonar.server.user.index.UserIndexer;
 import org.sonar.server.util.Validation;
@@ -60,16 +59,18 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.sonar.api.CoreProperties.CORE_AUTHENTICATOR_LOCAL_USERS;
+import static org.sonar.api.CoreProperties.CORE_DEFAULT_GROUP;
 
 @Category(DbTests.class)
 public class UserUpdaterTest {
 
-  @Rule
-  public DbTester db = DbTester.create(System2.INSTANCE);
-
+  static final String DEFAULT_LOGIN = "marius";
+  static final String TECHNICAL_USER = "tech_user";
   @ClassRule
   public static EsTester es = new EsTester().addDefinitions(new UserIndexDefinition(new Settings()));
-
+  @Rule
+  public DbTester db = DbTester.create(System2.INSTANCE);
   System2 system2 = mock(System2.class);
 
   NewUserNotifier newUserNotifier = mock(NewUserNotifier.class);
@@ -87,28 +88,22 @@ public class UserUpdaterTest {
 
   UserUpdater userUpdater;
 
-
   @Before
   public void setUp() {
-    db.truncateTables();
     es.truncateIndices();
     settings = new Settings();
-    session = db.myBatis().openSession(false);
+    settings.setProperty(CORE_AUTHENTICATOR_LOCAL_USERS, TECHNICAL_USER);
+    session = db.getSession();
     userDao = new UserDao(db.myBatis(), system2);
     groupDao = new GroupDao(system2);
     UserGroupDao userGroupDao = new UserGroupDao();
     GroupMembershipDao groupMembershipDao = new GroupMembershipDao(db.myBatis());
     groupMembershipFinder = new GroupMembershipFinder(userDao, groupMembershipDao);
 
-    DbClient dbClient = new DbClient(db.database(), db.myBatis(), userDao, groupDao, userGroupDao);
+    DbClient dbClient = new DbClient(db.database(), db.myBatis(), userDao, groupDao, userGroupDao, new UserTokenDao());
     userIndexer = (UserIndexer) new UserIndexer(dbClient, es.client()).setEnabled(true);
     userUpdater = new UserUpdater(newUserNotifier, settings, dbClient,
       userIndexer, system2, realmFactory);
-  }
-
-  @After
-  public void tearDown() {
-    session.close();
   }
 
   @Test
@@ -276,7 +271,7 @@ public class UserUpdaterTest {
   public void fail_to_create_user_with_missing_name() {
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName(null)
         .setEmail("marius@mail.com")
         .setPassword("password")
@@ -291,7 +286,7 @@ public class UserUpdaterTest {
   public void fail_to_create_user_with_too_long_name() {
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName(Strings.repeat("m", 201))
         .setEmail("marius@mail.com")
         .setPassword("password")
@@ -306,7 +301,7 @@ public class UserUpdaterTest {
   public void fail_to_create_user_with_too_long_email() {
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius")
         .setEmail(Strings.repeat("m", 101))
         .setPassword("password")
@@ -321,7 +316,7 @@ public class UserUpdaterTest {
   public void fail_to_create_user_with_missing_password() {
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius")
         .setEmail("marius@mail.com")
         .setPassword(null)
@@ -336,7 +331,7 @@ public class UserUpdaterTest {
   public void fail_to_create_user_with_missing_password_confirmation() {
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius")
         .setEmail("marius@mail.com")
         .setPassword("password")
@@ -351,7 +346,7 @@ public class UserUpdaterTest {
   public void fail_to_create_user_with_password_not_matching_password_confirmation() {
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius")
         .setEmail("marius@mail.com")
         .setPassword("password")
@@ -383,7 +378,7 @@ public class UserUpdaterTest {
 
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius")
         .setEmail("marius@mail.com")
         .setPassword("password")
@@ -401,7 +396,7 @@ public class UserUpdaterTest {
 
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius")
         .setEmail("marius@mail.com")
         .setPassword("password")
@@ -417,12 +412,12 @@ public class UserUpdaterTest {
   public void fail_to_create_user_when_scm_account_is_user_login() {
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius2")
         .setEmail("marius2@mail.com")
         .setPassword("password2")
         .setPasswordConfirmation("password2")
-        .setScmAccounts(newArrayList("marius")));
+        .setScmAccounts(newArrayList(DEFAULT_LOGIN)));
       fail();
     } catch (BadRequestException e) {
       assertThat(e.errors().messages()).containsOnly(Message.of("user.login_or_email_used_as_scm_account"));
@@ -433,7 +428,7 @@ public class UserUpdaterTest {
   public void fail_to_create_user_when_scm_account_is_user_email() {
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius2")
         .setEmail("marius2@mail.com")
         .setPassword("password2")
@@ -483,7 +478,7 @@ public class UserUpdaterTest {
 
   @Test
   public void fail_to_associate_default_group_to_user_if_no_default_group() {
-    settings.setProperty(CoreProperties.CORE_DEFAULT_GROUP, (String) null);
+    settings.setProperty(CORE_DEFAULT_GROUP, (String) null);
 
     try {
       userUpdater.create(NewUser.create()
@@ -500,7 +495,7 @@ public class UserUpdaterTest {
 
   @Test
   public void fail_to_associate_default_group_when_default_group_does_not_exist() {
-    settings.setProperty(CoreProperties.CORE_DEFAULT_GROUP, "polop");
+    settings.setProperty(CORE_DEFAULT_GROUP, "polop");
 
     try {
       userUpdater.create(NewUser.create()
@@ -523,14 +518,14 @@ public class UserUpdaterTest {
     createDefaultGroup();
 
     boolean result = userUpdater.create(NewUser.create()
-      .setLogin("marius")
+      .setLogin(DEFAULT_LOGIN)
       .setName("Marius2")
       .setEmail("marius2@mail.com")
       .setPassword("password2")
       .setPasswordConfirmation("password2"));
     session.commit();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.isActive()).isTrue();
     assertThat(dto.getName()).isEqualTo("Marius2");
     assertThat(dto.getEmail()).isEqualTo("marius2@mail.com");
@@ -551,7 +546,7 @@ public class UserUpdaterTest {
 
     try {
       userUpdater.create(NewUser.create()
-        .setLogin("marius")
+        .setLogin(DEFAULT_LOGIN)
         .setName("Marius2")
         .setEmail("marius2@mail.com")
         .setPassword("password2")
@@ -568,14 +563,14 @@ public class UserUpdaterTest {
     createDefaultGroup();
 
     userUpdater.create(NewUser.create()
-      .setLogin("marius")
+      .setLogin(DEFAULT_LOGIN)
       .setName("Marius2")
       .setEmail("marius2@mail.com")
       .setPassword("password2")
       .setPasswordConfirmation("password2"));
     session.commit();
 
-    GroupMembershipFinder.Membership membership = groupMembershipFinder.find(GroupMembershipQuery.builder().login("marius").groupSearch("sonar-users").build());
+    GroupMembershipFinder.Membership membership = groupMembershipFinder.find(GroupMembershipQuery.builder().login(DEFAULT_LOGIN).groupSearch("sonar-users").build());
     assertThat(membership.groups()).hasSize(1);
     assertThat(membership.groups().get(0).name()).isEqualTo("sonar-users");
     assertThat(membership.groups().get(0).isMember()).isTrue();
@@ -587,7 +582,7 @@ public class UserUpdaterTest {
     when(system2.now()).thenReturn(1418215735486L);
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setName("Marius2")
       .setEmail("marius2@mail.com")
       .setPassword("password2")
@@ -596,7 +591,7 @@ public class UserUpdaterTest {
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.isActive()).isTrue();
     assertThat(dto.getName()).isEqualTo("Marius2");
     assertThat(dto.getEmail()).isEqualTo("marius2@mail.com");
@@ -611,7 +606,7 @@ public class UserUpdaterTest {
     assertThat(indexUsers).hasSize(1);
     assertThat(indexUsers.get(0).getSource())
       .contains(
-        entry("login", "marius"),
+        entry("login", DEFAULT_LOGIN),
         entry("name", "Marius2"),
         entry("email", "marius2@mail.com"));
   }
@@ -622,7 +617,7 @@ public class UserUpdaterTest {
     when(system2.now()).thenReturn(1418215735486L);
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setName("Marius2")
       .setEmail("marius2@mail.com")
       .setPassword("password2")
@@ -631,7 +626,7 @@ public class UserUpdaterTest {
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.isActive()).isTrue();
     assertThat(dto.getName()).isEqualTo("Marius2");
     assertThat(dto.getEmail()).isEqualTo("marius2@mail.com");
@@ -646,7 +641,7 @@ public class UserUpdaterTest {
     assertThat(indexUsers).hasSize(1);
     assertThat(indexUsers.get(0).getSource())
       .contains(
-        entry("login", "marius"),
+        entry("login", DEFAULT_LOGIN),
         entry("name", "Marius2"),
         entry("email", "marius2@mail.com"));
   }
@@ -656,7 +651,7 @@ public class UserUpdaterTest {
     db.prepareDbUnit(getClass(), "update_user.xml");
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setName("Marius2")
       .setEmail("marius2@mail.com")
       .setPassword("password2")
@@ -665,7 +660,7 @@ public class UserUpdaterTest {
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.getScmAccountsAsList()).containsOnly("ma2");
   }
 
@@ -674,12 +669,12 @@ public class UserUpdaterTest {
     db.prepareDbUnit(getClass(), "update_user.xml");
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setName("Marius2"));
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.getName()).isEqualTo("Marius2");
 
     // Following fields has not changed
@@ -694,12 +689,12 @@ public class UserUpdaterTest {
     db.prepareDbUnit(getClass(), "update_user.xml");
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setEmail("marius2@mail.com"));
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.getEmail()).isEqualTo("marius2@mail.com");
 
     // Following fields has not changed
@@ -714,12 +709,12 @@ public class UserUpdaterTest {
     db.prepareDbUnit(getClass(), "update_user.xml");
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setScmAccounts(newArrayList("ma2")));
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.getScmAccountsAsList()).containsOnly("ma2");
 
     // Following fields has not changed
@@ -734,12 +729,12 @@ public class UserUpdaterTest {
     db.prepareDbUnit(getClass(), "update_user.xml");
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setScmAccounts(newArrayList("ma", "marius33")));
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.getScmAccountsAsList()).containsOnly("ma", "marius33");
   }
 
@@ -748,12 +743,12 @@ public class UserUpdaterTest {
     db.prepareDbUnit(getClass(), "update_user.xml");
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setScmAccounts(null));
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.getScmAccounts()).isNull();
   }
 
@@ -762,13 +757,13 @@ public class UserUpdaterTest {
     db.prepareDbUnit(getClass(), "update_user.xml");
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setPassword("password2")
       .setPasswordConfirmation("password2"));
     session.commit();
     session.clearCache();
 
-    UserDto dto = userDao.selectByLogin(session, "marius");
+    UserDto dto = userDao.selectByLogin(session, DEFAULT_LOGIN);
     assertThat(dto.getSalt()).isNotEqualTo("79bd6a8e79fb8c76ac8b121cc7e8e11ad1af8365");
     assertThat(dto.getCryptedPassword()).isNotEqualTo("650d2261c98361e2f67f90ce5c65a95e7d8ea2fg");
 
@@ -782,11 +777,10 @@ public class UserUpdaterTest {
   public void fail_to_update_password_when_external_auth_is_used() {
     db.prepareDbUnit(getClass(), "update_user.xml");
     createDefaultGroup();
-
     when(realmFactory.hasExternalAuthentication()).thenReturn(true);
 
     try {
-      userUpdater.update(UpdateUser.create("marius")
+      userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
         .setPassword("password2")
         .setPasswordConfirmation("password2"));
     } catch (BadRequestException e) {
@@ -794,13 +788,27 @@ public class UserUpdaterTest {
     }
   }
 
+  @Test
+  public void update_password_of_technical_user_when_external_auth_is_used() {
+    db.prepareDbUnit(getClass(), "update_technical_user.xml");
+    createDefaultGroup();
+    when(realmFactory.hasExternalAuthentication()).thenReturn(true);
+
+    userUpdater.update(UpdateUser.create(TECHNICAL_USER)
+      .setPassword("password2")
+      .setPasswordConfirmation("password2"));
+
+    UserDto dto = userDao.selectByLogin(session, TECHNICAL_USER);
+    assertThat(dto.getSalt()).isNotEqualTo("79bd6a8e79fb8c76ac8b121cc7e8e11ad1af8365");
+  }
 
   @Test
-  public void associate_default_group_when_updating_user() {
+  public void not_associate_default_group_when_updating_user() {
     db.prepareDbUnit(getClass(), "associate_default_groups_when_updating_user.xml");
     createDefaultGroup();
 
-    userUpdater.update(UpdateUser.create("marius")
+    // Existing user, he has no group, and should not be associated to the default one
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setName("Marius2")
       .setEmail("marius2@mail.com")
       .setPassword("password2")
@@ -808,25 +816,25 @@ public class UserUpdaterTest {
       .setScmAccounts(newArrayList("ma2")));
     session.commit();
 
-    GroupMembershipFinder.Membership membership = groupMembershipFinder.find(GroupMembershipQuery.builder().login("marius").groupSearch("sonar-users").build());
+    GroupMembershipFinder.Membership membership = groupMembershipFinder.find(GroupMembershipQuery.builder().login(DEFAULT_LOGIN).groupSearch("sonar-users").build());
     assertThat(membership.groups()).hasSize(1);
     assertThat(membership.groups().get(0).name()).isEqualTo("sonar-users");
-    assertThat(membership.groups().get(0).isMember()).isTrue();
+    assertThat(membership.groups().get(0).isMember()).isFalse();
   }
 
   @Test
   public void not_associate_default_group_when_updating_user_if_already_existing() {
     db.prepareDbUnit(getClass(), "not_associate_default_group_when_updating_user_if_already_existing.xml");
-    settings.setProperty(CoreProperties.CORE_DEFAULT_GROUP, "sonar-users");
+    settings.setProperty(CORE_DEFAULT_GROUP, "sonar-users");
     session.commit();
 
     // User is already associate to the default group
-    GroupMembershipFinder.Membership membership = groupMembershipFinder.find(GroupMembershipQuery.builder().login("marius").groupSearch("sonar-users").build());
+    GroupMembershipFinder.Membership membership = groupMembershipFinder.find(GroupMembershipQuery.builder().login(DEFAULT_LOGIN).groupSearch("sonar-users").build());
     assertThat(membership.groups()).hasSize(1);
     assertThat(membership.groups().get(0).name()).isEqualTo("sonar-users");
     assertThat(membership.groups().get(0).isMember()).isTrue();
 
-    userUpdater.update(UpdateUser.create("marius")
+    userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
       .setName("Marius2")
       .setEmail("marius2@mail.com")
       .setPassword("password2")
@@ -835,7 +843,7 @@ public class UserUpdaterTest {
     session.commit();
 
     // Nothing as changed
-    membership = groupMembershipFinder.find(GroupMembershipQuery.builder().login("marius").groupSearch("sonar-users").build());
+    membership = groupMembershipFinder.find(GroupMembershipQuery.builder().login(DEFAULT_LOGIN).groupSearch("sonar-users").build());
     assertThat(membership.groups()).hasSize(1);
     assertThat(membership.groups().get(0).name()).isEqualTo("sonar-users");
     assertThat(membership.groups().get(0).isMember()).isTrue();
@@ -847,7 +855,7 @@ public class UserUpdaterTest {
     createDefaultGroup();
 
     try {
-      userUpdater.update(UpdateUser.create("marius")
+      userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
         .setName("Marius2")
         .setEmail("marius2@mail.com")
         .setPassword("password2")
@@ -865,8 +873,8 @@ public class UserUpdaterTest {
     createDefaultGroup();
 
     try {
-      userUpdater.update(UpdateUser.create("marius")
-        .setScmAccounts(newArrayList("marius")));
+      userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
+        .setScmAccounts(newArrayList(DEFAULT_LOGIN)));
       fail();
     } catch (BadRequestException e) {
       assertThat(e.errors().messages()).containsOnly(Message.of("user.login_or_email_used_as_scm_account"));
@@ -879,7 +887,7 @@ public class UserUpdaterTest {
     createDefaultGroup();
 
     try {
-      userUpdater.update(UpdateUser.create("marius")
+      userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
         .setScmAccounts(newArrayList("marius@lesbronzes.fr")));
       fail();
     } catch (BadRequestException e) {
@@ -893,7 +901,7 @@ public class UserUpdaterTest {
     createDefaultGroup();
 
     try {
-      userUpdater.update(UpdateUser.create("marius")
+      userUpdater.update(UpdateUser.create(DEFAULT_LOGIN)
         .setEmail("marius@newmail.com")
         .setScmAccounts(newArrayList("marius@newmail.com")));
       fail();
@@ -903,7 +911,7 @@ public class UserUpdaterTest {
   }
 
   private void createDefaultGroup() {
-    settings.setProperty(CoreProperties.CORE_DEFAULT_GROUP, "sonar-users");
+    settings.setProperty(CORE_DEFAULT_GROUP, "sonar-users");
     groupDao.insert(session, new GroupDto().setName("sonar-users").setDescription("Sonar Users"));
     session.commit();
   }

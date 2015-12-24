@@ -19,9 +19,12 @@
  */
 package org.sonar.batch.issue.tracking;
 
+import javax.annotation.CheckForNull;
+
+import org.sonar.core.issue.tracking.Trackable;
 import org.sonar.api.rule.RuleKey;
 
-public class ServerIssueFromWs implements ServerIssue {
+public class ServerIssueFromWs implements Trackable {
 
   private org.sonar.batch.protocol.input.BatchInput.ServerIssue dto;
 
@@ -33,29 +36,30 @@ public class ServerIssueFromWs implements ServerIssue {
     return dto;
   }
 
-  @Override
   public String key() {
     return dto.getKey();
   }
 
   @Override
-  public RuleKey ruleKey() {
+  public RuleKey getRuleKey() {
     return RuleKey.of(dto.getRuleRepository(), dto.getRuleKey());
   }
 
   @Override
-  public String checksum() {
+  @CheckForNull
+  public String getLineHash() {
     return dto.hasChecksum() ? dto.getChecksum() : null;
   }
 
   @Override
-  public Integer line() {
+  @CheckForNull
+  public Integer getLine() {
     return dto.hasLine() ? dto.getLine() : null;
   }
 
   @Override
-  public String message() {
-    return dto.hasMsg() ? dto.getMsg() : null;
+  public String getMessage() {
+    return dto.hasMsg() ? dto.getMsg() : "";
   }
 
 }

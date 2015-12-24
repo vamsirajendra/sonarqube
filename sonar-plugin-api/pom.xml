@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>org.codehaus.sonar</groupId>
-    <artifactId>sonar</artifactId>
-    <version>5.2-SNAPSHOT</version>
+    <groupId>org.sonarsource.sonarqube</groupId>
+    <artifactId>sonarqube</artifactId>
+    <version>5.4-SNAPSHOT</version>
   </parent>
 
   <artifactId>sonar-plugin-api</artifactId>
@@ -57,11 +56,11 @@
     embedded by plugins.
     -->
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-check-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-colorizer</artifactId>
       <exclusions>
         <exclusion>
@@ -71,7 +70,7 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-duplications</artifactId>
       <exclusions>
         <exclusion>
@@ -163,7 +162,7 @@
 
     <!-- unit tests -->
     <dependency>
-      <groupId>org.codehaus.sonar</groupId>
+      <groupId>${project.groupId}</groupId>
       <artifactId>sonar-testing-harness</artifactId>
       <scope>test</scope>
     </dependency>

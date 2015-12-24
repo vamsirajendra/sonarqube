@@ -10,7 +10,9 @@ import Router from './router';
 import Plugins from './plugins';
 
 var App = new Marionette.Application(),
-    init = function (options) {
+    init = function () {
+      let options = window.sonarqube;
+
       // State
       this.state = new Backbone.Model({
         updateCenterActive: window.SS.updateCenterActive
@@ -53,12 +55,10 @@ var App = new Marionette.Application(),
       });
     };
 
-App.on('start', function (options) {
-  window.requestMessages().done(function () {
-    init.call(App, options);
-  });
+App.on('start', function () {
+  init.call(App);
 });
 
-export default App;
+window.sonarqube.appStarted.then(options => App.start(options));
 
 

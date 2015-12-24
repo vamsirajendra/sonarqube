@@ -1,8 +1,10 @@
 import Marionette from 'backbone.marionette';
-import SourceViewer from 'components/source-viewer/main';
+import SourceViewer from '../../components/source-viewer/main';
 
 var App = new Marionette.Application(),
-    init = function (options) {
+    init = function () {
+      let options = window.sonarqube;
+
       this.addRegions({ mainRegion: options.el });
 
       var viewer = new SourceViewer();
@@ -17,12 +19,10 @@ var App = new Marionette.Application(),
       }
     };
 
-App.on('start', function (options) {
-  window.requestMessages().done(function () {
-    init.call(App, options);
-  });
+App.on('start', function () {
+  init.call(App);
 });
 
-export default App;
+window.sonarqube.appStarted.then(options => App.start(options));
 
 

@@ -35,16 +35,9 @@ import org.sonar.server.db.DbClient;
 import org.sonar.server.es.SearchOptions;
 
 import static com.google.common.collect.Sets.newHashSet;
-import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_CUSTOM;
-import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_DESCRIPTION;
-import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_DIRECTION;
-import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_DOMAIN;
-import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_HIDDEN;
+import static org.sonar.server.es.SearchOptions.MAX_LIMIT;
 import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_ID;
 import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_KEY;
-import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_NAME;
-import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_QUALITATIVE;
-import static org.sonar.server.metric.ws.MetricJsonWriter.FIELD_TYPE;
 
 public class SearchAction implements MetricsWsAction {
 
@@ -52,8 +45,6 @@ public class SearchAction implements MetricsWsAction {
 
   public static final String PARAM_IS_CUSTOM = "isCustom";
 
-  private static final Set<String> OPTIONAL_FIELDS = newHashSet(FIELD_NAME, FIELD_DESCRIPTION, FIELD_DOMAIN, FIELD_TYPE, FIELD_DIRECTION, FIELD_QUALITATIVE, FIELD_HIDDEN,
-    FIELD_CUSTOM);
   private final Set<String> allPossibleFields;
 
   private final DbClient dbClient;
@@ -61,7 +52,7 @@ public class SearchAction implements MetricsWsAction {
   public SearchAction(DbClient dbClient) {
     this.dbClient = dbClient;
     Set<String> possibleFields = newHashSet(FIELD_ID, FIELD_KEY);
-    possibleFields.addAll(OPTIONAL_FIELDS);
+    possibleFields.addAll(MetricJsonWriter.OPTIONAL_FIELDS);
     allPossibleFields = possibleFields;
   }
 
@@ -69,9 +60,10 @@ public class SearchAction implements MetricsWsAction {
   public void define(WebService.NewController context) {
     WebService.NewAction action = context.createAction(ACTION)
       .setSince("5.2")
+      .setDescription("Search for metrics")
       .setResponseExample(getClass().getResource("example-search.json"))
-      .addPagingParams(100)
-      .addFieldsParam(OPTIONAL_FIELDS)
+      .addPagingParams(100, MAX_LIMIT)
+      .addFieldsParam(MetricJsonWriter.OPTIONAL_FIELDS)
       .setHandler(this);
 
     action.createParam(PARAM_IS_CUSTOM)

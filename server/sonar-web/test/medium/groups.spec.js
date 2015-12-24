@@ -6,8 +6,8 @@ define(function (require) {
     bdd.it('should show list', function () {
       return this.remote
           .open()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search.json')
-          .startApp('groups')
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search.json')
+          .startAppBrowserify('groups')
           .checkElementInclude('#content', 'sonar-users')
           .checkElementExist('#groups-list ul')
           .checkElementCount('#groups-list li[data-id]', 2)
@@ -22,18 +22,18 @@ define(function (require) {
     bdd.it('should search', function () {
       return this.remote
           .open()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search.json')
-          .startApp('groups')
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search.json')
+          .startAppBrowserify('groups')
           .checkElementInclude('#content', 'sonar-users')
           .checkElementCount('#groups-list li[data-id]', 2)
           .clearMocks()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search-filtered.json', { data: { q: 'adm' } })
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search-filtered.json', { data: { q: 'adm' } })
           .fillElement('#groups-search-query', 'adm')
           .clickElement('#groups-search-submit')
           .checkElementInclude('#groups-list-footer', '1/1')
           .checkElementCount('#groups-list li[data-id]', 1)
           .clearMocks()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search.json')
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search.json')
           .fillElement('#groups-search-query', '')
           .clickElement('#groups-search-submit')
           .checkElementInclude('#groups-list-footer', '2/2')
@@ -43,13 +43,13 @@ define(function (require) {
     bdd.it('should show more', function () {
       return this.remote
           .open()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search-big-1.json')
-          .startApp('groups')
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search-big-1.json')
+          .startAppBrowserify('groups')
           .checkElementInclude('#content', 'sonar-users')
           .checkElementCount('#groups-list li[data-id]', 1)
           .checkElementInclude('#groups-list-footer', '1/2')
           .clearMocks()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search-big-2.json', { data: { p: 2 } })
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search-big-2.json', { data: { p: 2 } })
           .clickElement('#groups-fetch-more')
           .checkElementInclude('#groups-list-footer', '2/2')
           .checkElementCount('#groups-list li[data-id]', 2);
@@ -58,9 +58,9 @@ define(function (require) {
     bdd.it('should show users', function () {
       return this.remote
           .open()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search.json')
-          .mockFromFile('/api/usergroups/users*', 'groups-spec/users.json')
-          .startApp('groups')
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search.json')
+          .mockFromFile('/api/user_groups/users*', 'groups-spec/users.json')
+          .startAppBrowserify('groups')
           .checkElementInclude('#content', 'sonar-users')
           .checkElementNotInclude('#content', 'Bob')
           .clickElement('[data-id="1"] .js-group-users')
@@ -71,9 +71,9 @@ define(function (require) {
     bdd.it('should create new group', function () {
       return this.remote
           .open()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search.json')
-          .mockFromFile('/api/usergroups/create', 'groups-spec/error.json', { status: 400 })
-          .startApp('groups')
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search.json')
+          .mockFromFile('/api/user_groups/create', 'groups-spec/error.json', { status: 400 })
+          .startAppBrowserify('groups')
           .checkElementInclude('#content', 'sonar-users')
           .checkElementCount('#groups-list li[data-id]', 2)
           .clickElement('#groups-create')
@@ -83,8 +83,8 @@ define(function (require) {
           .clickElement('#create-group-submit')
           .checkElementExist('.alert.alert-danger')
           .clearMocks()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search-created.json')
-          .mockFromString('/api/usergroups/create', '{}', { data: { name: 'name', description: 'description' } })
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search-created.json')
+          .mockFromString('/api/user_groups/create', '{}', { data: { name: 'name', description: 'description' } })
           .fillElement('#create-group-name', 'name')
           .fillElement('#create-group-description', 'description')
           .clickElement('#create-group-submit')
@@ -96,9 +96,9 @@ define(function (require) {
     bdd.it('should update group', function () {
       return this.remote
           .open()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search.json')
-          .mockFromFile('/api/usergroups/update', 'groups-spec/error.json', { status: 400 })
-          .startApp('groups')
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search.json')
+          .mockFromFile('/api/user_groups/update', 'groups-spec/error.json', { status: 400 })
+          .startAppBrowserify('groups')
           .checkElementInclude('#content', 'sonar-users')
           .clickElement('[data-id="2"] .js-group-update')
           .checkElementExist('#create-group-form')
@@ -107,8 +107,8 @@ define(function (require) {
           .clickElement('#create-group-submit')
           .checkElementExist('.alert.alert-danger')
           .clearMocks()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search-updated.json')
-          .mockFromString('/api/usergroups/update', '{}', { data: { id: '2' } })
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search-updated.json')
+          .mockFromString('/api/user_groups/update', '{}', { data: { id: '2' } })
           .fillElement('#create-group-name', 'guys')
           .fillElement('#create-group-description', 'cool guys')
           .clickElement('#create-group-submit')
@@ -119,9 +119,9 @@ define(function (require) {
     bdd.it('should delete group', function () {
       return this.remote
           .open()
-          .mockFromFile('/api/usergroups/search', 'groups-spec/search.json')
-          .mockFromFile('/api/usergroups/delete', 'groups-spec/error.json', { status: 400 })
-          .startApp('groups')
+          .mockFromFile('/api/user_groups/search', 'groups-spec/search.json')
+          .mockFromFile('/api/user_groups/delete', 'groups-spec/error.json', { status: 400 })
+          .startAppBrowserify('groups')
           .checkElementInclude('#content', 'sonar-users')
           .clickElement('[data-id="1"] .js-group-delete')
           .checkElementExist('#delete-group-form')
@@ -132,7 +132,7 @@ define(function (require) {
           .clickElement('[data-id="1"] .js-group-delete')
           .checkElementExist('#delete-group-form')
           .clearMocks()
-          .mockFromString('/api/usergroups/delete', '{}', { data: { id: '1' } })
+          .mockFromString('/api/user_groups/delete', '{}', { data: { id: '1' } })
           .clickElement('#delete-group-submit')
           .checkElementNotExist('[data-id="1"]');
     });

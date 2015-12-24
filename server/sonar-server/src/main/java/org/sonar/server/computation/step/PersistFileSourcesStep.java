@@ -20,12 +20,16 @@
 
 package org.sonar.server.computation.step;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.CheckForNull;
+import javax.annotation.Nullable;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang.ObjectUtils;
 import org.apache.ibatis.session.ResultContext;
 import org.apache.ibatis.session.ResultHandler;
 import org.sonar.api.utils.System2;
@@ -43,11 +47,16 @@ import org.sonar.server.computation.component.CrawlerDepthLimit;
 import org.sonar.server.computation.component.DepthTraversalTypeAwareCrawler;
 import org.sonar.server.computation.component.TreeRootHolder;
 import org.sonar.server.computation.component.TypeAwareVisitorAdapter;
+import org.sonar.server.computation.duplication.DuplicationRepository;
+import org.sonar.server.computation.scm.Changeset;
+import org.sonar.server.computation.scm.ScmInfo;
+import org.sonar.server.computation.scm.ScmInfoRepository;
 import org.sonar.server.computation.source.ComputeFileSourceData;
 import org.sonar.server.computation.source.CoverageLineReader;
 import org.sonar.server.computation.source.DuplicationLineReader;
 import org.sonar.server.computation.source.HighlightingLineReader;
 import org.sonar.server.computation.source.LineReader;
+import org.sonar.server.computation.source.RangeOffsetConverter;
 import org.sonar.server.computation.source.ScmLineReader;
 import org.sonar.server.computation.source.SourceLinesRepository;
 import org.sonar.server.computation.source.SymbolsLineReader;
@@ -61,13 +70,18 @@ public class PersistFileSourcesStep implements ComputationStep {
   private final TreeRootHolder treeRootHolder;
   private final BatchReportReader reportReader;
   private final SourceLinesRepository sourceLinesRepository;
+  private final ScmInfoRepository scmInfoRepository;
+  private final DuplicationRepository duplicationRepository;
 
-  public PersistFileSourcesStep(DbClient dbClient, System2 system2, TreeRootHolder treeRootHolder, BatchReportReader reportReader, SourceLinesRepository sourceLinesRepository) {
+  public PersistFileSourcesStep(DbClient dbClient, System2 system2, TreeRootHolder treeRootHolder, BatchReportReader reportReader, SourceLinesRepository sourceLinesRepository,
+    ScmInfoRepository scmInfoRepository, DuplicationRepository duplicationRepository) {
     this.dbClient = dbClient;
     this.system2 = system2;
     this.treeRootHolder = treeRootHolder;
     this.reportReader = reportReader;
     this.sourceLinesRepository = sourceLinesRepository;
+    this.scmInfoRepository = scmInfoRepository;
+    this.duplicationRepository = duplicationRepository;
   }
 
   @Override
@@ -112,11 +126,11 @@ public class PersistFileSourcesStep implements ComputationStep {
       int fileRef = file.getReportAttributes().getRef();
       BatchReport.Component component = reportReader.readComponent(fileRef);
       CloseableIterator<String> linesIterator = sourceLinesRepository.readLines(file);
-      LineReaders lineReaders = new LineReaders(reportReader, fileRef);
+      LineReaders lineReaders = new LineReaders(reportReader, scmInfoRepository, duplicationRepository, file);
       try {
         ComputeFileSourceData computeFileSourceData = new ComputeFileSourceData(linesIterator, lineReaders.readers(), component.getLines());
         ComputeFileSourceData.Data fileSourceData = computeFileSourceData.compute();
-        persistSource(fileSourceData, file.getUuid());
+        persistSource(fileSourceData, file.getUuid(), lineReaders.getLatestChange());
       } catch (Exception e) {
         throw new IllegalStateException(String.format("Cannot persist sources of %s", file.getKey()), e);
       } finally {
@@ -125,7 +139,7 @@ public class PersistFileSourcesStep implements ComputationStep {
       }
     }
 
-    private void persistSource(ComputeFileSourceData.Data fileSourceData, String componentUuid) {
+    private void persistSource(ComputeFileSourceData.Data fileSourceData, String componentUuid, @Nullable Changeset latestChange) {
       DbFileSources.Data fileData = fileSourceData.getFileSourceData();
 
       byte[] data = FileSourceDto.encodeSourceData(fileData);
@@ -144,23 +158,24 @@ public class PersistFileSourcesStep implements ComputationStep {
           .setDataHash(dataHash)
           .setLineHashes(lineHashes)
           .setCreatedAt(system2.now())
-          .setUpdatedAt(system2.now());
+          .setUpdatedAt(system2.now())
+          .setRevision(computeRevision(latestChange));
         dbClient.fileSourceDao().insert(session, dto);
         session.commit();
       } else {
-        // Update only if data_hash has changed or if src_hash is missing (progressive migration)
+        // Update only if data_hash has changed or if src_hash is missing or revision is missing (progressive migration)
         boolean binaryDataUpdated = !dataHash.equals(previousDto.getDataHash());
         boolean srcHashUpdated = !srcHash.equals(previousDto.getSrcHash());
-        if (binaryDataUpdated || srcHashUpdated) {
+        String revision = computeRevision(previousDto, latestChange);
+        boolean revisionUpdated = !ObjectUtils.equals(revision, previousDto.getRevision());
+        if (binaryDataUpdated || srcHashUpdated || revisionUpdated) {
           previousDto
             .setBinaryData(data)
             .setDataHash(dataHash)
             .setSrcHash(srcHash)
-            .setLineHashes(lineHashes);
-          // Optimization only change updated at when updating binary data to avoid unnecessary indexation by E/S
-          if (binaryDataUpdated) {
-            previousDto.setUpdatedAt(system2.now());
-          }
+            .setLineHashes(lineHashes)
+            .setRevision(revision)
+            .setUpdatedAt(system2.now());
           dbClient.fileSourceDao().update(previousDto);
           session.commit();
         }
@@ -168,31 +183,52 @@ public class PersistFileSourcesStep implements ComputationStep {
     }
   }
 
+  @CheckForNull
+  private static String computeRevision(FileSourceDto previousDto, @Nullable Changeset latestChange) {
+    if (latestChange == null) {
+      return previousDto.getRevision();
+    }
+    return latestChange.getRevision();
+  }
+
+  @CheckForNull
+  private static String computeRevision(@Nullable Changeset latestChange) {
+    if (latestChange == null) {
+      return null;
+    }
+    return latestChange.getRevision();
+  }
+
   private static class LineReaders {
     private final List<LineReader> readers = new ArrayList<>();
     private final List<CloseableIterator<?>> closeables = new ArrayList<>();
+    @CheckForNull
+    private final ScmLineReader scmLineReader;
 
-    LineReaders(BatchReportReader reportReader, int componentRef) {
+    LineReaders(BatchReportReader reportReader, ScmInfoRepository scmInfoRepository, DuplicationRepository duplicationRepository, Component component) {
+      int componentRef = component.getReportAttributes().getRef();
       CloseableIterator<BatchReport.Coverage> coverageIt = reportReader.readComponentCoverage(componentRef);
       closeables.add(coverageIt);
       readers.add(new CoverageLineReader(coverageIt));
 
-      BatchReport.Changesets scmReport = reportReader.readChangesets(componentRef);
-      if (scmReport != null) {
-        readers.add(new ScmLineReader(scmReport));
+      Optional<ScmInfo> scmInfoOptional = scmInfoRepository.getScmInfo(component);
+      if (scmInfoOptional.isPresent()) {
+        this.scmLineReader = new ScmLineReader(scmInfoOptional.get());
+        readers.add(scmLineReader);
+      } else {
+        this.scmLineReader = null;
       }
 
+      RangeOffsetConverter rangeOffsetConverter = new RangeOffsetConverter();
       CloseableIterator<BatchReport.SyntaxHighlighting> highlightingIt = reportReader.readComponentSyntaxHighlighting(componentRef);
       closeables.add(highlightingIt);
-      readers.add(new HighlightingLineReader(highlightingIt));
+      readers.add(new HighlightingLineReader(component, highlightingIt, rangeOffsetConverter));
 
       CloseableIterator<BatchReport.Symbol> symbolsIt = reportReader.readComponentSymbols(componentRef);
       closeables.add(symbolsIt);
-      readers.add(new SymbolsLineReader(symbolsIt));
+      readers.add(new SymbolsLineReader(component, symbolsIt, rangeOffsetConverter));
 
-      CloseableIterator<BatchReport.Duplication> duplicationsIt = reportReader.readComponentDuplications(componentRef);
-      closeables.add(duplicationsIt);
-      readers.add(new DuplicationLineReader(duplicationsIt));
+      readers.add(new DuplicationLineReader(duplicationRepository.getDuplications(component)));
     }
 
     List<LineReader> readers() {
@@ -203,6 +239,14 @@ public class PersistFileSourcesStep implements ComputationStep {
       for (CloseableIterator<?> reportIterator : closeables) {
         reportIterator.close();
       }
+    }
+
+    @CheckForNull
+    public Changeset getLatestChange() {
+      if (scmLineReader == null) {
+        return null;
+      }
+      return scmLineReader.getLatestChange();
     }
   }
 

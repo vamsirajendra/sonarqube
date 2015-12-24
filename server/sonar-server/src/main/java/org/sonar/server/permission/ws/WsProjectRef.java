@@ -22,37 +22,35 @@ package org.sonar.server.permission.ws;
 
 import com.google.common.base.Optional;
 import javax.annotation.CheckForNull;
-import org.sonar.api.server.ws.Request;
+import javax.annotation.Nullable;
 
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PROJECT_ID;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PROJECT_KEY;
 import static org.sonar.server.ws.WsUtils.checkRequest;
 
 /**
  * Project identifiers from a WS request. Guaranties the project id and project key are not provided at the same time.
  */
 public class WsProjectRef {
+  private static final String MSG_ID_OR_KEY_MUST_BE_PROVIDED = "Project id or project key must be provided, not both.";
   private final String uuid;
   private final String key;
 
-  private WsProjectRef(Request wsRequest) {
-    this.uuid = wsRequest.param(PARAM_PROJECT_ID);
-    this.key = wsRequest.param(PARAM_PROJECT_KEY);
-    checkRequest(uuid != null ^ key != null, "Project id or project key can be provided, not both.");
+  private WsProjectRef(@Nullable String uuid, @Nullable String key) {
+    this.uuid = uuid;
+    this.key = key;
+    checkRequest(this.uuid != null ^ this.key != null, "Project id or project key can be provided, not both.");
   }
 
-  public static Optional<WsProjectRef> optionalFromRequest(Request wsRequest) {
-    if (!hasProjectParam(wsRequest)) {
+  public static Optional<WsProjectRef> newOptionalWsProjectRef(@Nullable String uuid, @Nullable String key) {
+    if (uuid == null && key == null) {
       return Optional.absent();
     }
 
-    return Optional.of(new WsProjectRef(wsRequest));
+    return Optional.of(new WsProjectRef(uuid, key));
   }
 
-  public static WsProjectRef fromRequest(Request wsRequest) {
-    checkRequest(hasProjectParam(wsRequest), "Project id or project key must be provided, not both.");
-
-    return new WsProjectRef(wsRequest);
+  public static WsProjectRef newWsProjectRef(@Nullable String uuid, @Nullable String key) {
+    checkRequest(uuid == null ^ key == null, MSG_ID_OR_KEY_MUST_BE_PROVIDED);
+    return new WsProjectRef(uuid, key);
   }
 
   @CheckForNull
@@ -63,9 +61,5 @@ public class WsProjectRef {
   @CheckForNull
   public String key() {
     return this.key;
-  }
-
-  private static boolean hasProjectParam(Request wsRequest) {
-    return wsRequest.hasParam(PARAM_PROJECT_ID) || wsRequest.hasParam(PARAM_PROJECT_KEY);
   }
 }

@@ -29,7 +29,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.sonar.batch.mediumtest.BatchMediumTester;
 import org.sonar.batch.mediumtest.TaskResult;
-import org.sonar.batch.protocol.input.ActiveRule;
 import org.sonar.xoo.XooPlugin;
 import org.sonar.xoo.rule.XooRulesDefinition;
 
@@ -44,7 +43,7 @@ public class IssuesOnDirMediumTest {
     .registerPlugin("xoo", new XooPlugin())
     .addDefaultQProfile("xoo", "Sonar Way")
     .addRules(new XooRulesDefinition())
-    .activateRule(new ActiveRule("xoo", "OneIssueOnDirPerFile", null, "One issue per line", "MINOR", "xoo", "xoo"))
+    .addActiveRule("xoo", "OneIssueOnDirPerFile", null, "One issue per line", "MINOR", "xoo", "xoo")
     .build();
 
   @Before
@@ -83,6 +82,32 @@ public class IssuesOnDirMediumTest {
       .start();
 
     assertThat(result.issuesFor(result.inputDir("src"))).hasSize(2);
+  }
+
+  @Test
+  public void issueOnRootFolder() throws IOException {
+
+    File baseDir = temp.getRoot();
+
+    File xooFile1 = new File(baseDir, "sample1.xoo");
+    FileUtils.write(xooFile1, "Sample1 xoo\ncontent");
+
+    File xooFile2 = new File(baseDir, "sample2.xoo");
+    FileUtils.write(xooFile2, "Sample2 xoo\ncontent");
+
+    TaskResult result = tester.newTask()
+      .properties(ImmutableMap.<String, String>builder()
+        .put("sonar.task", "scan")
+        .put("sonar.projectBaseDir", baseDir.getAbsolutePath())
+        .put("sonar.projectKey", "com.foo.project")
+        .put("sonar.projectName", "Foo Project")
+        .put("sonar.projectVersion", "1.0-SNAPSHOT")
+        .put("sonar.projectDescription", "Description of Foo Project")
+        .put("sonar.sources", ".")
+        .build())
+      .start();
+
+    assertThat(result.issuesFor(result.inputDir(""))).hasSize(2);
   }
 
 }

@@ -58,18 +58,15 @@ import org.sonar.server.component.ComponentFinder;
 import org.sonar.server.component.ComponentService;
 import org.sonar.server.component.DefaultComponentFinder;
 import org.sonar.server.component.DefaultRubyComponentService;
-import org.sonar.server.component.ws.ComponentsWs;
-import org.sonar.server.component.ws.EventsWs;
-import org.sonar.server.component.ws.ResourcesWs;
+import org.sonar.server.component.ws.ComponentsWsModule;
 import org.sonar.server.computation.CeModule;
 import org.sonar.server.computation.container.ReportProcessingModule;
 import org.sonar.server.computation.queue.CeQueueModule;
+import org.sonar.server.computation.taskprocessor.CeTaskProcessorModule;
 import org.sonar.server.computation.ws.CeWsModule;
 import org.sonar.server.config.ws.PropertiesWs;
 import org.sonar.server.dashboard.template.GlobalDefaultDashboard;
-import org.sonar.server.dashboard.template.ProjectDefaultDashboard;
-import org.sonar.server.dashboard.template.ProjectIssuesDashboard;
-import org.sonar.server.dashboard.template.ProjectTimeMachineDashboard;
+import org.sonar.server.dashboard.template.ProjectCustomDashboard;
 import org.sonar.server.dashboard.widget.ActionPlansWidget;
 import org.sonar.server.dashboard.widget.AlertsWidget;
 import org.sonar.server.dashboard.widget.BubbleChartWidget;
@@ -109,6 +106,8 @@ import org.sonar.server.debt.DebtModelPluginRepository;
 import org.sonar.server.debt.DebtModelService;
 import org.sonar.server.debt.DebtModelXMLExporter;
 import org.sonar.server.debt.DebtRulesXMLImporter;
+import org.sonar.server.devcockpit.bridge.DevCockpitBootstrap;
+import org.sonar.server.devcockpit.bridge.DevCockpitStopper;
 import org.sonar.server.duplication.ws.DuplicationsJsonWriter;
 import org.sonar.server.duplication.ws.DuplicationsParser;
 import org.sonar.server.duplication.ws.DuplicationsWs;
@@ -167,6 +166,7 @@ import org.sonar.server.permission.PermissionService;
 import org.sonar.server.permission.PermissionUpdater;
 import org.sonar.server.permission.ws.PermissionsWsModule;
 import org.sonar.server.platform.BackendCleanup;
+import org.sonar.server.platform.ServerLogging;
 import org.sonar.server.platform.SettingsChangeNotifier;
 import org.sonar.server.platform.monitoring.DatabaseMonitor;
 import org.sonar.server.platform.monitoring.EsMonitor;
@@ -174,9 +174,11 @@ import org.sonar.server.platform.monitoring.JvmPropertiesMonitor;
 import org.sonar.server.platform.monitoring.PluginsMonitor;
 import org.sonar.server.platform.monitoring.SonarQubeMonitor;
 import org.sonar.server.platform.monitoring.SystemMonitor;
+import org.sonar.server.platform.ws.ChangeLogLevelAction;
 import org.sonar.server.platform.ws.DbMigrationStatusAction;
 import org.sonar.server.platform.ws.InfoAction;
 import org.sonar.server.platform.ws.L10nWs;
+import org.sonar.server.platform.ws.LogsAction;
 import org.sonar.server.platform.ws.MigrateDbAction;
 import org.sonar.server.platform.ws.RestartAction;
 import org.sonar.server.platform.ws.ServerWs;
@@ -204,6 +206,7 @@ import org.sonar.server.qualitygate.ws.CreateConditionAction;
 import org.sonar.server.qualitygate.ws.DeleteConditionAction;
 import org.sonar.server.qualitygate.ws.DeselectAction;
 import org.sonar.server.qualitygate.ws.DestroyAction;
+import org.sonar.server.qualitygate.ws.ProjectStatusAction;
 import org.sonar.server.qualitygate.ws.QGatesWs;
 import org.sonar.server.qualitygate.ws.SelectAction;
 import org.sonar.server.qualitygate.ws.SetAsDefaultAction;
@@ -235,6 +238,7 @@ import org.sonar.server.qualityprofile.ws.ExportAction;
 import org.sonar.server.qualityprofile.ws.ExportersAction;
 import org.sonar.server.qualityprofile.ws.ImportersAction;
 import org.sonar.server.qualityprofile.ws.InheritanceAction;
+import org.sonar.server.qualityprofile.ws.OldRestoreAction;
 import org.sonar.server.qualityprofile.ws.ProfilesWs;
 import org.sonar.server.qualityprofile.ws.ProjectAssociationActions;
 import org.sonar.server.qualityprofile.ws.ProjectsAction;
@@ -299,14 +303,15 @@ import org.sonar.server.user.ws.UserJsonWriter;
 import org.sonar.server.user.ws.UserPropertiesWs;
 import org.sonar.server.user.ws.UsersWs;
 import org.sonar.server.usergroups.ws.UserGroupsModule;
+import org.sonar.server.usertoken.UserTokenModule;
 import org.sonar.server.util.TypeValidationModule;
 import org.sonar.server.view.bridge.ViewsBootstrap;
 import org.sonar.server.view.bridge.ViewsStopper;
 import org.sonar.server.view.index.ViewIndex;
 import org.sonar.server.view.index.ViewIndexDefinition;
 import org.sonar.server.view.index.ViewIndexer;
-import org.sonar.server.ws.ListingWs;
 import org.sonar.server.ws.WebServiceEngine;
+import org.sonar.server.ws.WebServicesWs;
 import org.sonar.server.ws.WsResponseCommonFormat;
 
 public class PlatformLevel4 extends PlatformLevel {
@@ -348,9 +353,7 @@ public class PlatformLevel4 extends PlatformLevel {
       // Dashboard
       DashboardsWs.class,
       org.sonar.server.dashboard.ws.ShowAction.class,
-      ProjectDefaultDashboard.class,
-      ProjectIssuesDashboard.class,
-      ProjectTimeMachineDashboard.class,
+      ProjectCustomDashboard.class,
       GlobalDefaultDashboard.class,
       AlertsWidget.class,
       CoverageWidget.class,
@@ -418,6 +421,7 @@ public class PlatformLevel4 extends PlatformLevel {
       ExportersAction.class,
       QProfilesWs.class,
       ProfilesWs.class,
+      OldRestoreAction.class,
       RuleActivationActions.class,
       BulkRuleActivationActions.class,
       ProjectAssociationActions.class,
@@ -504,11 +508,12 @@ public class PlatformLevel4 extends PlatformLevel {
       DeleteConditionAction.class,
       UpdateConditionAction.class,
       org.sonar.server.qualitygate.ws.AppAction.class,
+      ProjectStatusAction.class,
       QGatesWs.class,
 
       // web services
       WebServiceEngine.class,
-      ListingWs.class,
+      WebServicesWs.class,
 
       // localization
       L10nWs.class,
@@ -537,6 +542,7 @@ public class PlatformLevel4 extends PlatformLevel {
       UserIndexer.class,
       UserIndex.class,
       UserUpdater.class,
+      UserTokenModule.class,
 
       // groups
       GroupMembershipService.class,
@@ -552,15 +558,11 @@ public class PlatformLevel4 extends PlatformLevel {
 
       // components
       ProjectsWsModule.class,
+      ComponentsWsModule.class,
       DefaultComponentFinder.class,
       DefaultRubyComponentService.class,
       ComponentService.class,
       ComponentFinder.class,
-      ResourcesWs.class,
-      ComponentsWs.class,
-      org.sonar.server.component.ws.AppAction.class,
-      org.sonar.server.component.ws.SearchAction.class,
-      EventsWs.class,
       NewAlerts.class,
       NewAlerts.newMetadata(),
       ComponentCleanerService.class,
@@ -671,6 +673,7 @@ public class PlatformLevel4 extends PlatformLevel {
       TypeValidationModule.class,
 
       // System
+      ServerLogging.class,
       RestartAction.class,
       InfoAction.class,
       UpgradesAction.class,
@@ -683,6 +686,8 @@ public class PlatformLevel4 extends PlatformLevel {
       JvmPropertiesMonitor.class,
       DatabaseMonitor.class,
       MigrateDbAction.class,
+      LogsAction.class,
+      ChangeLogLevelAction.class,
       DbMigrationStatusAction.class,
 
       // Plugins WS
@@ -698,15 +703,20 @@ public class PlatformLevel4 extends PlatformLevel {
       CancelAllAction.class,
       PluginsWs.class,
 
-      // Compute engine
-      CeModule.class,
-      CeQueueModule.class,
-      CeWsModule.class,
-      ReportProcessingModule.class,
-
       // Views plugin
       ViewsBootstrap.class,
       ViewsStopper.class,
+
+      // Developer Cockpit plugin
+      DevCockpitBootstrap.class,
+      DevCockpitStopper.class,
+
+      // Compute engine (must be after Views and Developer Cockpit)
+      CeModule.class,
+      CeQueueModule.class,
+      CeTaskProcessorModule.class,
+      CeWsModule.class,
+      ReportProcessingModule.class,
 
       // UI
       GlobalNavigationAction.class,

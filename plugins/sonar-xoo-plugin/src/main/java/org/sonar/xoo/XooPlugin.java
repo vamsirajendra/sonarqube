@@ -19,12 +19,8 @@
  */
 package org.sonar.xoo;
 
-import org.sonar.xoo.rule.OneBlockerIssuePerFileSensor;
-
-import org.sonar.xoo.rule.HasTagSensor;
-import org.sonar.xoo.rule.OneIssuePerModuleSensor;
-import org.sonar.xoo.rule.OneIssuePerFileSensor;
-import org.sonar.xoo.rule.Xoo2BasicProfile;
+import java.util.Arrays;
+import java.util.List;
 import org.sonar.api.SonarPlugin;
 import org.sonar.xoo.coverage.ItCoverageSensor;
 import org.sonar.xoo.coverage.OverallCoverageSensor;
@@ -39,23 +35,26 @@ import org.sonar.xoo.lang.XooTokenizer;
 import org.sonar.xoo.rule.ChecksSensor;
 import org.sonar.xoo.rule.CreateIssueByInternalKeySensor;
 import org.sonar.xoo.rule.DeprecatedResourceApiSensor;
+import org.sonar.xoo.rule.HasTagSensor;
 import org.sonar.xoo.rule.MultilineIssuesSensor;
+import org.sonar.xoo.rule.OneBlockerIssuePerFileSensor;
+import org.sonar.xoo.rule.OneDayDebtPerFileSensor;
 import org.sonar.xoo.rule.OneIssueOnDirPerFileSensor;
+import org.sonar.xoo.rule.OneIssuePerFileSensor;
 import org.sonar.xoo.rule.OneIssuePerLineSensor;
+import org.sonar.xoo.rule.OneIssuePerModuleSensor;
 import org.sonar.xoo.rule.RandomAccessSensor;
+import org.sonar.xoo.rule.Xoo2BasicProfile;
+import org.sonar.xoo.rule.XooBasicProfile;
 import org.sonar.xoo.rule.XooEmptyProfile;
 import org.sonar.xoo.rule.XooFakeExporter;
 import org.sonar.xoo.rule.XooFakeImporter;
 import org.sonar.xoo.rule.XooFakeImporterWithMessages;
-import org.sonar.xoo.rule.XooBasicProfile;
 import org.sonar.xoo.rule.XooRulesDefinition;
 import org.sonar.xoo.scm.XooBlameCommand;
 import org.sonar.xoo.scm.XooScmProvider;
 import org.sonar.xoo.test.CoveragePerTestSensor;
 import org.sonar.xoo.test.TestExecutionSensor;
-
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * Plugin entry-point, as declared in pom.xml.
@@ -98,6 +97,7 @@ public class XooPlugin extends SonarPlugin {
 
       OneBlockerIssuePerFileSensor.class,
       OneIssuePerLineSensor.class,
+      OneDayDebtPerFileSensor.class,
       OneIssuePerFileSensor.class,
       OneIssuePerModuleSensor.class,
       OneIssueOnDirPerFileSensor.class,

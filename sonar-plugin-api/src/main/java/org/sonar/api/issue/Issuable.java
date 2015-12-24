@@ -96,6 +96,12 @@ public interface Issuable extends Perspective {
 
     /**
      * @since 5.2
+     * @see NewIssue#addLocation(NewIssueLocation)
+     */
+    IssueBuilder addLocation(NewIssueLocation secondaryLocation);
+
+    /**
+     * @since 5.2
      * @see NewIssue#addFlow(Iterable)
      */
     IssueBuilder addFlow(Iterable<NewIssueLocation> flowLocations);
@@ -113,6 +119,9 @@ public interface Issuable extends Perspective {
 
     IssueBuilder effortToFix(@Nullable Double d);
 
+    /**
+     * No more supported from batch side since 5.2
+     */
     IssueBuilder attribute(String key, @Nullable String value);
 
     Issue build();

@@ -26,12 +26,14 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.utils.System2;
 import org.sonar.api.web.UserRole;
 import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.db.DbTester;
+import org.sonar.db.component.ResourceTypesRule;
 import org.sonar.db.permission.PermissionTemplateDto;
 import org.sonar.db.user.GroupDto;
 import org.sonar.db.user.GroupTesting;
@@ -45,6 +47,7 @@ import org.sonar.server.exceptions.UnauthorizedException;
 import org.sonar.server.permission.ws.DeleteTemplateAction;
 import org.sonar.server.permission.ws.PermissionDependenciesFinder;
 import org.sonar.server.tester.UserSessionRule;
+import org.sonar.server.usergroups.ws.UserGroupFinder;
 import org.sonar.server.ws.TestRequest;
 import org.sonar.server.ws.TestResponse;
 import org.sonar.server.ws.WsActionTester;
@@ -54,8 +57,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.internal.util.collections.Sets.newSet;
 import static org.sonar.db.permission.PermissionTemplateTesting.newPermissionTemplateDto;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_TEMPLATE_UUID;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_TEMPLATE_NAME;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME;
 
 public class DeleteTemplateActionTest {
 
@@ -67,6 +70,7 @@ public class DeleteTemplateActionTest {
   public UserSessionRule userSession = UserSessionRule.standalone();
   @Rule
   public ExpectedException expectedException = ExpectedException.none();
+  ResourceTypesRule resourceTypes = new ResourceTypesRule().setRootQualifiers(Qualifiers.PROJECT, Qualifiers.VIEW, "DEV");
 
   WsActionTester ws;
   DbClient dbClient;
@@ -83,7 +87,7 @@ public class DeleteTemplateActionTest {
     dbSession = db.getSession();
     defaultTemplatePermissionFinder = mock(DefaultPermissionTemplateFinder.class);
     when(defaultTemplatePermissionFinder.getDefaultTemplateUuids()).thenReturn(Collections.<String>emptySet());
-    PermissionDependenciesFinder finder = new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient));
+    PermissionDependenciesFinder finder = new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient), new UserGroupFinder(dbClient), resourceTypes);
     ws = new WsActionTester(new DeleteTemplateAction(dbClient, userSession, finder, defaultTemplatePermissionFinder));
 
     permissionTemplate = insertTemplateAndAssociatedPermissions(newPermissionTemplateDto().setUuid(TEMPLATE_UUID));
@@ -168,7 +172,7 @@ public class DeleteTemplateActionTest {
   private TestResponse newRequest(@Nullable String id) {
     TestRequest request = ws.newRequest();
     if (id != null) {
-      request.setParam(PARAM_TEMPLATE_UUID, id);
+      request.setParam(PARAM_TEMPLATE_ID, id);
     }
 
     TestResponse result = executeRequest(request);

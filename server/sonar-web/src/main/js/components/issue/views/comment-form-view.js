@@ -1,11 +1,11 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import PopupView from 'components/common/popup';
-import '../templates';
+import PopupView from '../../common/popup';
+import Template from '../templates/comment-form.hbs';
 
 export default PopupView.extend({
   className: 'bubble-popup issue-comment-bubble-popup',
-  template: Templates['comment-form'],
+  template: Template,
 
   ui: {
     textarea: '.issue-comment-form-text textarea',
@@ -40,6 +40,9 @@ export default PopupView.extend({
   onKeydown: function (e) {
     if (e.keyCode === 27) {
       this.destroy();
+    }
+    if (e.keyCode === 13 && (e.metaKey || e.ctrlKey)) {
+      this.submit();
     }
   },
 

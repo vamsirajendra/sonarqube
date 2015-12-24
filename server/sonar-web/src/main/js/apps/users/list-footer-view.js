@@ -1,9 +1,9 @@
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/users-list-footer.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['users-list-footer'],
+  template: Template,
 
   collectionEvents: {
     'all': 'render'
@@ -23,7 +23,7 @@ export default Marionette.ItemView.extend({
   },
 
   serializeData: function () {
-    return _.extend(this._super(), {
+    return _.extend(Marionette.ItemView.prototype.serializeData.apply(this, arguments), {
       total: this.collection.total,
       count: this.collection.length,
       more: this.collection.hasMore()

@@ -39,12 +39,22 @@ import org.codehaus.staxmate.in.SMHierarchicCursor;
 import org.codehaus.staxmate.in.SMInputCursor;
 import org.sonar.api.rule.RuleKey;
 import org.sonar.api.server.ServerSide;
-import org.sonar.api.server.debt.DebtRemediationFunction;
 import org.sonar.api.utils.Duration;
 import org.sonar.api.utils.ValidationMessages;
 import org.sonar.server.debt.DebtModelXMLExporter.RuleDebt;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static java.lang.Boolean.FALSE;
+import static java.lang.Boolean.TRUE;
+import static javax.xml.stream.XMLInputFactory.IS_COALESCING;
+import static javax.xml.stream.XMLInputFactory.IS_NAMESPACE_AWARE;
+import static javax.xml.stream.XMLInputFactory.IS_VALIDATING;
+import static javax.xml.stream.XMLInputFactory.SUPPORT_DTD;
+import static org.apache.commons.lang.StringUtils.isNotBlank;
+import static org.sonar.api.server.debt.DebtRemediationFunction.Type.CONSTANT_ISSUE;
+import static org.sonar.api.server.debt.DebtRemediationFunction.Type.LINEAR;
+import static org.sonar.api.utils.Duration.MINUTE;
+import static org.sonar.server.debt.DebtCharacteristicsXMLImporter.convertKey;
 import static org.sonar.server.debt.DebtModelXMLExporter.CHARACTERISTIC;
 import static org.sonar.server.debt.DebtModelXMLExporter.CHARACTERISTIC_KEY;
 import static org.sonar.server.debt.DebtModelXMLExporter.PROPERTY;
@@ -89,10 +99,10 @@ public class DebtRulesXMLImporter {
 
   private static SMInputFactory initStax() {
     XMLInputFactory xmlFactory = XMLInputFactory2.newInstance();
-    xmlFactory.setProperty(XMLInputFactory.IS_COALESCING, Boolean.TRUE);
-    xmlFactory.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, Boolean.FALSE);
-    xmlFactory.setProperty(XMLInputFactory.SUPPORT_DTD, Boolean.FALSE);
-    xmlFactory.setProperty(XMLInputFactory.IS_VALIDATING, Boolean.FALSE);
+    xmlFactory.setProperty(IS_COALESCING, TRUE);
+    xmlFactory.setProperty(IS_NAMESPACE_AWARE, FALSE);
+    xmlFactory.setProperty(SUPPORT_DTD, FALSE);
+    xmlFactory.setProperty(IS_VALIDATING, FALSE);
     return new SMInputFactory(xmlFactory);
   }
 
@@ -110,7 +120,7 @@ public class DebtRulesXMLImporter {
         RuleDebt ruleDebt = processRule(validationMessages, cursor);
         if (ruleDebt != null && parentKey != null) {
           if (rootKey != null) {
-            ruleDebt.setSubCharacteristicKey(DebtCharacteristicsXMLImporter.convertKey(parentKey));
+            ruleDebt.setSubCharacteristicKey(convertKey(parentKey));
             ruleDebts.add(ruleDebt);
           } else {
             validationMessages.addWarningText("Rule '" + ruleDebt.ruleKey() + "' is ignored because it's defined directly under a root characteristic.");
@@ -134,7 +144,7 @@ public class DebtRulesXMLImporter {
         ruleKey = cursor.collectDescendantText().trim();
       }
     }
-    if (StringUtils.isNotBlank(ruleRepositoryKey) && StringUtils.isNotBlank(ruleKey)) {
+    if (isNotBlank(ruleRepositoryKey) && isNotBlank(ruleKey)) {
       return createRule(RuleKey.of(ruleRepositoryKey, ruleKey), properties, validationMessages);
     }
     return null;
@@ -160,7 +170,7 @@ public class DebtRulesXMLImporter {
         }
       } else if (StringUtils.equals(node, PROPERTY_TEXT_VALUE)) {
         textValue = c.collectDescendantText().trim();
-        textValue = "mn".equals(textValue) ? Duration.MINUTE : textValue;
+        textValue = "mn".equals(textValue) ? MINUTE : textValue;
       }
     }
     return new Property(key, value, textValue);
@@ -169,13 +179,11 @@ public class DebtRulesXMLImporter {
   @CheckForNull
   private static RuleDebt createRule(RuleKey ruleKey, Properties properties, ValidationMessages validationMessages) {
     Property function = properties.function();
-    if (function != null) {
-
-      Property coefficientProperty = properties.coefficient();
-      String coefficient = coefficientProperty != null ? coefficientProperty.toDuration() : null;
-      Property offsetProperty = properties.offset();
-      String offset = offsetProperty != null ? offsetProperty.toDuration() : null;
-
+    Property coefficientProperty = properties.coefficient();
+    String coefficient = coefficientProperty == null ? null : coefficientProperty.toDuration();
+    Property offsetProperty = properties.offset();
+    String offset = offsetProperty == null ? null : offsetProperty.toDuration();
+    if (function != null && (coefficient != null || offset != null)) {
       return createRuleDebt(ruleKey, function.getTextValue(), coefficient, offset, validationMessages);
     }
     return null;
@@ -183,28 +191,29 @@ public class DebtRulesXMLImporter {
 
   @CheckForNull
   private static RuleDebt createRuleDebt(RuleKey ruleKey, String function, @Nullable String coefficient, @Nullable String offset, ValidationMessages validationMessages) {
+    if ("constant_resource".equals(function)) {
+      validationMessages.addWarningText(String.format("Constant/file function is no longer used, technical debt definitions on '%s' are ignored.", ruleKey));
+      return null;
+    }
     if ("linear_threshold".equals(function) && coefficient != null) {
       validationMessages.addWarningText(String.format("Linear with threshold function is no longer used, remediation function of '%s' is replaced by linear.", ruleKey));
-      return new RuleDebt().setRuleKey(ruleKey).setFunction(DebtRemediationFunction.Type.LINEAR.name()).setCoefficient(coefficient);
-    } else if ("constant_resource".equals(function)) {
-      validationMessages.addWarningText(String.format("Constant/file function is no longer used, technical debt definitions on '%s' are ignored.", ruleKey));
-    } else if (DebtRemediationFunction.Type.CONSTANT_ISSUE.name().equalsIgnoreCase(function) && coefficient != null && offset == null) {
-      return new RuleDebt().setRuleKey(ruleKey).setFunction(DebtRemediationFunction.Type.CONSTANT_ISSUE.name()).setOffset(coefficient);
-    } else {
-      return new RuleDebt().setRuleKey(ruleKey).setFunction(function.toUpperCase()).setCoefficient(coefficient).setOffset(offset);
+      return createRuleDebt(ruleKey, LINEAR.name(), coefficient, null, validationMessages);
     }
-    return null;
+    if (CONSTANT_ISSUE.name().equalsIgnoreCase(function) && coefficient != null && offset == null) {
+      return createRuleDebt(ruleKey, CONSTANT_ISSUE.name(), null, coefficient, validationMessages);
+    }
+    return new RuleDebt().setRuleKey(ruleKey).setFunction(function.toUpperCase()).setCoefficient(coefficient).setOffset(offset);
   }
 
   private static class Properties {
-    List<Property> properties;
+    List<Property> list;
 
     public Properties() {
-      this.properties = newArrayList();
+      this.list = newArrayList();
     }
 
     public Properties add(Property property) {
-      this.properties.add(property);
+      this.list.add(property);
       return this;
     }
 
@@ -221,7 +230,7 @@ public class DebtRulesXMLImporter {
     }
 
     private Property find(String key) {
-      return Iterables.find(properties, new PropertyMathKey(key), null);
+      return Iterables.find(list, new PropertyMatchKey(key), null);
     }
   }
 
@@ -259,10 +268,10 @@ public class DebtRulesXMLImporter {
     }
   }
 
-  private static class PropertyMathKey implements Predicate<Property> {
+  private static class PropertyMatchKey implements Predicate<Property> {
     private final String key;
 
-    public PropertyMathKey(String key) {
+    public PropertyMatchKey(String key) {
       this.key = key;
     }
 
@@ -271,6 +280,5 @@ public class DebtRulesXMLImporter {
       return input.getKey().equals(key);
     }
   }
-
 
 }

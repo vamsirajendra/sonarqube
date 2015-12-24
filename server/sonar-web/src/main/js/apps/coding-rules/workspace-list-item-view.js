@@ -1,14 +1,15 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import Backbone from 'backbone';
-import WorkspaceListItemView from 'components/navigator/workspace-list-item-view';
+import WorkspaceListItemView from '../../components/navigator/workspace-list-item-view';
 import ProfileActivationView from './rule/profile-activation-view';
 import RuleFilterMixin from './rule/rule-filter-mixin';
-import './templates';
+import Template from './templates/coding-rules-workspace-list-item.hbs';
+import confirmDialog from './confirm-dialog';
 
 export default WorkspaceListItemView.extend(RuleFilterMixin).extend({
   className: 'coding-rule',
-  template: Templates['coding-rules-workspace-list-item'],
+  template: Template,
 
   modelEvents: {
     'change': 'render'
@@ -60,9 +61,9 @@ export default WorkspaceListItemView.extend(RuleFilterMixin).extend({
     var that = this,
         ruleKey = this.model.get('key'),
         activation = this.model.get('activation');
-    window.confirmDialog({
-      title: t('coding_rules.deactivate'),
-      html: tp('coding_rules.deactivate.confirm'),
+    confirmDialog({
+      title: window.t('coding_rules.deactivate'),
+      html: window.tp('coding_rules.deactivate.confirm'),
       yesHandler: function () {
         return $.ajax({
           type: 'POST',
@@ -86,5 +87,3 @@ export default WorkspaceListItemView.extend(RuleFilterMixin).extend({
     });
   }
 });
-
-

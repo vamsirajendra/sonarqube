@@ -20,7 +20,6 @@
 
 package org.sonar.server.permission.ws.template;
 
-import java.util.Set;
 import org.sonar.api.i18n.I18n;
 import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.resources.ResourceTypes;
@@ -32,19 +31,20 @@ import org.sonar.db.DbSession;
 import org.sonar.db.permission.PermissionTemplateDto;
 import org.sonar.server.permission.ws.PermissionDependenciesFinder;
 import org.sonar.server.permission.ws.PermissionsWsAction;
-import org.sonar.server.permission.ws.WsTemplateRef;
 import org.sonar.server.platform.PersistentSettings;
 import org.sonar.server.user.UserSession;
+import org.sonarqube.ws.client.permission.SetDefaultTemplateWsRequest;
 
-import static com.google.common.collect.FluentIterable.from;
-import static com.google.common.collect.Ordering.natural;
-import static java.lang.String.format;
 import static org.sonar.server.permission.DefaultPermissionTemplates.defaultRootQualifierTemplateProperty;
 import static org.sonar.server.permission.PermissionPrivilegeChecker.checkGlobalAdminUser;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_QUALIFIER;
-import static org.sonar.server.permission.ws.WsPermissionParameters.createTemplateParameters;
 import static org.sonar.server.permission.ws.PermissionRequestValidator.validateQualifier;
-import static org.sonar.server.permission.ws.ResourceTypeToQualifier.RESOURCE_TYPE_TO_QUALIFIER;
+import static org.sonar.server.permission.ws.PermissionsWsParametersBuilder.createTemplateParameters;
+import static org.sonar.server.permission.ws.WsTemplateRef.newTemplateRef;
+import static org.sonar.server.ws.WsParameterBuilder.QualifierParameterContext.newQualifierParameterContext;
+import static org.sonar.server.ws.WsParameterBuilder.createRootQualifierParameter;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_QUALIFIER;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME;
 
 public class SetDefaultTemplateAction implements PermissionsWsAction {
   private final DbClient dbClient;
@@ -74,52 +74,36 @@ public class SetDefaultTemplateAction implements PermissionsWsAction {
       .setHandler(this);
 
     createTemplateParameters(action);
-
-    action.createParam(PARAM_QUALIFIER)
-      .setDescription("Project qualifier. Possible values are:" + buildRootQualifiersDescription())
-      .setDefaultValue(Qualifiers.PROJECT)
-      .setPossibleValues(getRootQualifiers());
+    createRootQualifierParameter(action, newQualifierParameterContext(userSession, i18n, resourceTypes))
+      .setDefaultValue(Qualifiers.PROJECT);
   }
 
   @Override
-  public void handle(Request wsRequest, Response wsResponse) throws Exception {
+  public void handle(Request request, Response response) throws Exception {
+    doHandle(toSetDefaultTemplateWsRequest(request));
+    response.noContent();
+  }
+
+  private void doHandle(SetDefaultTemplateWsRequest request) {
     checkGlobalAdminUser(userSession);
 
-    String qualifier = wsRequest.mandatoryParam(PARAM_QUALIFIER);
-
-    PermissionTemplateDto template = getTemplate(wsRequest);
-    validateQualifier(qualifier, getRootQualifiers());
+    String qualifier = request.getQualifier();
+    PermissionTemplateDto template = getTemplate(request);
+    validateQualifier(qualifier, resourceTypes);
     setDefaultTemplateUuid(template.getUuid(), qualifier);
-    wsResponse.noContent();
   }
 
-  private Set<String> getRootQualifiers() {
-    return from(resourceTypes.getRoots())
-      .transform(RESOURCE_TYPE_TO_QUALIFIER)
-      .toSortedSet(natural());
+  private static SetDefaultTemplateWsRequest toSetDefaultTemplateWsRequest(Request request) {
+    return new SetDefaultTemplateWsRequest()
+      .setQualifier(request.param(PARAM_QUALIFIER))
+      .setTemplateId(request.param(PARAM_TEMPLATE_ID))
+      .setTemplateName(request.param(PARAM_TEMPLATE_NAME));
   }
 
-  private String buildRootQualifiersDescription() {
-    StringBuilder description = new StringBuilder();
-    description.append("<ul>");
-    String qualifierPattern = "<li>%s - %s</li>";
-    for (String qualifier : getRootQualifiers()) {
-      description.append(format(qualifierPattern, qualifier, i18n(qualifier)));
-    }
-    description.append("</ul>");
-
-    return description.toString();
-  }
-
-  private String i18n(String qualifier) {
-    String qualifiersPropertyPrefix = "qualifiers.";
-    return i18n.message(userSession.locale(), qualifiersPropertyPrefix + qualifier, "");
-  }
-
-  private PermissionTemplateDto getTemplate(Request wsRequest) {
+  private PermissionTemplateDto getTemplate(SetDefaultTemplateWsRequest request) {
     DbSession dbSession = dbClient.openSession(false);
     try {
-      return finder.getTemplate(dbSession, WsTemplateRef.fromRequest(wsRequest));
+      return finder.getTemplate(dbSession, newTemplateRef(request.getTemplateId(), request.getTemplateName()));
     } finally {
       dbClient.closeSession(dbSession);
     }

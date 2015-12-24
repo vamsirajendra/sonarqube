@@ -20,120 +20,194 @@
 
 package org.sonar.server.component.ws;
 
-import com.google.common.collect.Sets;
-import java.util.Collection;
+import com.google.common.base.Function;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nonnull;
+import org.sonar.api.i18n.I18n;
+import org.sonar.api.resources.Languages;
+import org.sonar.api.resources.Qualifiers;
+import org.sonar.api.resources.ResourceTypes;
 import org.sonar.api.server.ws.Request;
-import org.sonar.api.server.ws.RequestHandler;
 import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.WebService;
 import org.sonar.api.server.ws.WebService.Param;
-import org.sonar.api.utils.text.JsonWriter;
-import org.sonar.api.web.UserRole;
+import org.sonar.api.utils.Paging;
+import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
-import org.sonar.db.MyBatis;
 import org.sonar.db.component.ComponentDto;
-import org.sonar.server.component.ComponentFinder;
-import org.sonar.server.es.SearchOptions;
+import org.sonar.db.component.ComponentQuery;
 import org.sonar.server.user.UserSession;
+import org.sonarqube.ws.WsComponents;
+import org.sonarqube.ws.WsComponents.SearchWsResponse;
+import org.sonarqube.ws.client.component.SearchWsRequest;
 
-import static com.google.common.collect.Sets.newLinkedHashSet;
-import static org.sonar.api.server.ws.WebService.Param.PAGE;
-import static org.sonar.api.server.ws.WebService.Param.PAGE_SIZE;
+import static com.google.common.collect.FluentIterable.from;
+import static com.google.common.collect.Ordering.natural;
+import static java.lang.String.format;
+import static org.sonar.server.component.ResourceTypeFunctions.RESOURCE_TYPE_TO_QUALIFIER;
+import static org.sonar.server.ws.WsUtils.checkRequest;
+import static org.sonar.server.ws.WsUtils.writeProtobuf;
+import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_LANGUAGE;
+import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_QUALIFIERS;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_QUALIFIER;
 
-public class SearchAction implements RequestHandler {
-
-  private static final short MINIMUM_SEARCH_CHARACTERS = 2;
-
-  private static final String PARAM_COMPONENT_UUID = "componentUuid";
+public class SearchAction implements ComponentsWsAction {
+  private static final String QUALIFIER_PROPERTY_PREFIX = "qualifiers.";
 
   private final DbClient dbClient;
+  private final ResourceTypes resourceTypes;
+  private final I18n i18n;
   private final UserSession userSession;
-  private final ComponentFinder componentFinder;
+  private final Languages languages;
 
-  public SearchAction(DbClient dbClient, UserSession userSession, ComponentFinder componentFinder) {
+  public SearchAction(DbClient dbClient, ResourceTypes resourceTypes, I18n i18n, UserSession userSession, Languages languages) {
     this.dbClient = dbClient;
+    this.resourceTypes = resourceTypes;
+    this.i18n = i18n;
     this.userSession = userSession;
-    this.componentFinder = componentFinder;
-  }
-
-  void define(WebService.NewController controller) {
-    WebService.NewAction action = controller.createAction("search")
-      .setDescription("Search for components. Currently limited to projects in a view or a sub-view")
-      .setSince("5.1")
-      .setInternal(true)
-      .setHandler(this);
-
-    action
-      .createParam(PARAM_COMPONENT_UUID)
-      .setRequired(true)
-      .setDescription("View or sub view UUID")
-      .setExampleValue("d6d9e1e5-5e13-44fa-ab82-3ec29efa8935");
-
-    action
-      .createParam(Param.TEXT_QUERY)
-      .setRequired(true)
-      .setDescription("UTF-8 search query")
-      .setExampleValue("sonar");
-
-    action.addPagingParams(10);
+    this.languages = languages;
   }
 
   @Override
-  public void handle(Request request, Response response) {
-    String query = request.mandatoryParam(Param.TEXT_QUERY);
-    if (query.length() < MINIMUM_SEARCH_CHARACTERS) {
-      throw new IllegalArgumentException(String.format("Minimum search is %s characters", MINIMUM_SEARCH_CHARACTERS));
-    }
-    String componentUuid = request.mandatoryParam(PARAM_COMPONENT_UUID);
+  public void define(WebService.NewController context) {
+    WebService.NewAction action = context.createAction("search")
+      .setSince("5.2")
+      .setInternal(true)
+      .setDescription("Search for components")
+      .addPagingParams(100)
+      .addSearchQuery("sona", "component names", "component keys")
+      .setResponseExample(getClass().getResource("search-components-example.json"))
+      .setHandler(this);
 
-    JsonWriter json = response.newJsonWriter();
-    json.beginObject();
+    action.createParam(PARAM_QUALIFIERS)
+      .setRequired(true)
+      .setExampleValue(format("%s,%s", Qualifiers.PROJECT, Qualifiers.MODULE))
+      .setDescription("Comma-separated list of component qualifiers. Possible values are " + buildQualifiersDescription());
 
-    DbSession session = dbClient.openSession(false);
-    try {
-      ComponentDto componentDto = componentFinder.getByUuid(session, componentUuid);
-      userSession.checkProjectUuidPermission(UserRole.USER, componentDto.projectUuid());
-
-      Set<Long> projectIds = newLinkedHashSet(dbClient.componentIndexDao().selectProjectIdsFromQueryAndViewOrSubViewUuid(session, query, componentDto.uuid()));
-      Collection<Long> authorizedProjectIds = dbClient.authorizationDao().keepAuthorizedProjectIds(session, projectIds, userSession.getUserId(), UserRole.USER);
-
-      SearchOptions options = new SearchOptions();
-      options.setPage(request.mandatoryParamAsInt(PAGE), request.mandatoryParamAsInt(PAGE_SIZE));
-      Set<Long> pagedProjectIds = pagedProjectIds(authorizedProjectIds, options);
-
-      List<ComponentDto> projects = dbClient.componentDao().selectByIds(session, pagedProjectIds);
-
-      options.writeJson(json, authorizedProjectIds.size());
-      json.name("components").beginArray();
-      for (ComponentDto project : projects) {
-        json.beginObject();
-        json.prop("uuid", project.uuid());
-        json.prop("name", project.name());
-        json.endObject();
-      }
-      json.endArray();
-    } finally {
-      MyBatis.closeQuietly(session);
-    }
-
-    json.endObject();
-    json.close();
+    action
+      .createParam(PARAM_LANGUAGE)
+      .setDescription("Language key. If provided, only components for the given language are returned.")
+      .setExampleValue(LanguageParamUtils.getExampleValue(languages))
+      .setPossibleValues(LanguageParamUtils.getLanguageKeys(languages))
+      .setSince("5.4");
   }
 
-  private static Set<Long> pagedProjectIds(Collection<Long> projectIds, SearchOptions options) {
-    Set<Long> results = Sets.newLinkedHashSet();
-    int index = 0;
-    for (Long projectId : projectIds) {
-      if (index >= options.getOffset() && results.size() < options.getLimit()) {
-        results.add(projectId);
-      } else if (results.size() >= options.getLimit()) {
-        break;
-      }
-      index++;
+  @Override
+  public void handle(Request wsRequest, Response wsResponse) throws Exception {
+    SearchWsResponse searchWsResponse = doHandle(toSearchWsRequest(wsRequest));
+    writeProtobuf(searchWsResponse, wsRequest, wsResponse);
+  }
+
+  private SearchWsResponse doHandle(SearchWsRequest request) {
+    userSession.checkLoggedIn().checkGlobalPermission(GlobalPermissions.SYSTEM_ADMIN);
+
+    List<String> qualifiers = request.getQualifiers();
+    validateQualifiers(qualifiers);
+
+    DbSession dbSession = dbClient.openSession(false);
+    try {
+      ComponentQuery query = buildQuery(request, qualifiers);
+      Paging paging = buildPaging(dbSession, request, query);
+      List<ComponentDto> components = searchComponents(dbSession, query, paging);
+      return buildResponse(components, paging);
+    } finally {
+      dbClient.closeSession(dbSession);
     }
-    return results;
+  }
+
+  private static SearchWsRequest toSearchWsRequest(Request request) {
+    return new SearchWsRequest()
+      .setQualifiers(request.mandatoryParamAsStrings(PARAM_QUALIFIERS))
+      .setLanguage(request.param(PARAM_LANGUAGE))
+      .setQuery(request.param(Param.TEXT_QUERY))
+      .setPage(request.mandatoryParamAsInt(Param.PAGE))
+      .setPageSize(request.mandatoryParamAsInt(Param.PAGE_SIZE));
+  }
+
+  private List<ComponentDto> searchComponents(DbSession dbSession, ComponentQuery query, Paging paging) {
+    return dbClient.componentDao().selectByQuery(
+      dbSession,
+      query,
+      paging.offset(),
+      paging.pageSize());
+  }
+
+  private SearchWsResponse buildResponse(List<ComponentDto> components, Paging paging) {
+    WsComponents.SearchWsResponse.Builder responseBuilder = SearchWsResponse.newBuilder();
+    responseBuilder.getPagingBuilder()
+      .setPageIndex(paging.pageIndex())
+      .setPageSize(paging.pageSize())
+      .setTotal(paging.total())
+      .build();
+
+    responseBuilder.addAllComponents(
+      from(components)
+        .transform(ComponentDToComponentResponseFunction.INSTANCE));
+
+    return responseBuilder.build();
+  }
+
+  private Paging buildPaging(DbSession dbSession, SearchWsRequest request, ComponentQuery query) {
+    int total = dbClient.componentDao().countByQuery(dbSession, query);
+    return Paging.forPageIndex(request.getPage())
+      .withPageSize(request.getPageSize())
+      .andTotal(total);
+  }
+
+  private ComponentQuery buildQuery(SearchWsRequest request, List<String> qualifiers) {
+    return new ComponentQuery(
+      request.getQuery(),
+      request.getLanguage(),
+      qualifiers.toArray(new String[qualifiers.size()]));
+  }
+
+  private void validateQualifiers(List<String> qualifiers) {
+    Set<String> possibleQualifiers = allQualifiers();
+    for (String qualifier : qualifiers) {
+      checkRequest(possibleQualifiers.contains(qualifier),
+        format("The '%s' parameter must be one of %s. '%s' was passed.", PARAM_QUALIFIER, possibleQualifiers, qualifier));
+    }
+  }
+
+  private Set<String> allQualifiers() {
+    return from(resourceTypes.getAll())
+      .transform(RESOURCE_TYPE_TO_QUALIFIER)
+      .toSortedSet(natural());
+  }
+
+  private String buildQualifiersDescription() {
+    StringBuilder description = new StringBuilder();
+    description.append("<ul>");
+    String qualifierPattern = "<li>%s - %s</li>";
+    for (String qualifier : allQualifiers()) {
+      description.append(format(qualifierPattern, qualifier, i18n(qualifier)));
+    }
+    description.append("</ul>");
+
+    return description.toString();
+  }
+
+  private String i18n(String qualifier) {
+    return i18n.message(userSession.locale(), QUALIFIER_PROPERTY_PREFIX + qualifier, "");
+  }
+
+  private enum ComponentDToComponentResponseFunction implements Function<ComponentDto, WsComponents.Component> {
+    INSTANCE;
+
+    @Override
+    public WsComponents.Component apply(@Nonnull ComponentDto dto) {
+      WsComponents.Component.Builder builder = WsComponents.Component.newBuilder()
+        .setId(dto.uuid())
+        .setKey(dto.key())
+        .setName(dto.name())
+        .setQualifier(dto.qualifier());
+      if (dto.language() != null) {
+        builder.setLanguage(dto.language());
+      }
+
+      return builder.build();
+    }
   }
 }

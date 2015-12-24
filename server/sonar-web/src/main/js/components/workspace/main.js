@@ -6,6 +6,7 @@ import ItemsView from './views/items-view';
 import ViewerView from './views/viewer-view';
 import RuleView from './views/rule-view';
 
+
 var instance = null,
 
     Workspace = function () {

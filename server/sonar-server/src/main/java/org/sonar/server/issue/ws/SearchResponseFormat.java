@@ -64,9 +64,9 @@ public class SearchResponseFormat {
     this.languages = languages;
   }
 
-  public Issues.Search formatSearch(Set<SearchAdditionalField> fields, SearchResponseData data,
+  public Issues.SearchWsResponse formatSearch(Set<SearchAdditionalField> fields, SearchResponseData data,
     Paging paging, @Nullable Facets facets) {
-    Issues.Search.Builder response = Issues.Search.newBuilder();
+    Issues.SearchWsResponse.Builder response = Issues.SearchWsResponse.newBuilder();
 
     formatPaging(paging, response);
     formatDebtTotal(data, response);
@@ -109,14 +109,14 @@ public class SearchResponseFormat {
     return response.build();
   }
 
-  private void formatDebtTotal(SearchResponseData data, Issues.Search.Builder response) {
+  private void formatDebtTotal(SearchResponseData data, Issues.SearchWsResponse.Builder response) {
     Long debt = data.getDebtTotal();
     if (debt != null) {
       response.setDebtTotal(debt);
     }
   }
 
-  private void formatPaging(Paging paging, Issues.Search.Builder response) {
+  private void formatPaging(Paging paging, Issues.SearchWsResponse.Builder response) {
     response.setP(paging.pageIndex());
     response.setPs(paging.pageSize());
     response.setTotal(paging.total());
@@ -138,7 +138,6 @@ public class SearchResponseFormat {
       if (fields.contains(SearchAdditionalField.COMMENTS)) {
         formatIssueComments(data, issueBuilder, dto);
       }
-      // TODO attributes
       result.add(issueBuilder.build());
     }
     return result;
@@ -153,10 +152,10 @@ public class SearchResponseFormat {
     ComponentDto project = data.getComponentByUuid(dto.getProjectUuid());
     if (project != null) {
       issueBuilder.setProject(project.getKey());
-    }
-    ComponentDto subProject = data.getComponentByUuid(dto.getModuleUuid());
-    if (subProject != null) {
-      issueBuilder.setSubProject(subProject.getKey());
+      ComponentDto subProject = data.getComponentByUuid(dto.getModuleUuid());
+      if (subProject != null && !subProject.getKey().equals(project.getKey())) {
+        issueBuilder.setSubProject(subProject.getKey());
+      }
     }
     issueBuilder.setRule(dto.getRuleKey().toString());
     issueBuilder.setSeverity(Common.Severity.valueOf(dto.getSeverity()));
@@ -384,7 +383,7 @@ public class SearchResponseFormat {
     return wsLangs;
   }
 
-  private void formatFacets(Facets facets, Issues.Search.Builder wsSearch) {
+  private void formatFacets(Facets facets, Issues.SearchWsResponse.Builder wsSearch) {
     Common.Facets.Builder wsFacets = Common.Facets.newBuilder();
     Common.Facet.Builder wsFacet = Common.Facet.newBuilder();
     for (Map.Entry<String, LinkedHashMap<String, Long>> facet : facets.getAll().entrySet()) {

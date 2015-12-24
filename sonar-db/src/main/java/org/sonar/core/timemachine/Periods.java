@@ -22,13 +22,20 @@ package org.sonar.core.timemachine;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Locale;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.StringUtils;
-import org.sonar.api.CoreProperties;
 import org.sonar.api.config.Settings;
 import org.sonar.api.i18n.I18n;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Locale.ENGLISH;
+import static org.apache.commons.lang.StringUtils.isNotBlank;
+import static org.sonar.core.config.CorePropertyDefinitions.TIMEMACHINE_MODE_DATE;
+import static org.sonar.core.config.CorePropertyDefinitions.TIMEMACHINE_MODE_DAYS;
+import static org.sonar.core.config.CorePropertyDefinitions.TIMEMACHINE_MODE_PREVIOUS_ANALYSIS;
+import static org.sonar.core.config.CorePropertyDefinitions.TIMEMACHINE_MODE_PREVIOUS_VERSION;
+import static org.sonar.core.config.CorePropertyDefinitions.TIMEMACHINE_MODE_VERSION;
+import static org.sonar.core.config.CorePropertyDefinitions.TIMEMACHINE_PERIOD_PREFIX;
 
 public class Periods {
 
@@ -41,78 +48,7 @@ public class Periods {
   }
 
   @CheckForNull
-  public String label(int periodIndex) {
-    String periodProperty = settings.getString(CoreProperties.TIMEMACHINE_PERIOD_PREFIX + periodIndex);
-    PeriodParameters periodParameters = new PeriodParameters(periodProperty);
-    return label(periodParameters.getMode(), periodParameters.getParam(), periodParameters.getDate());
-  }
-
-  @CheckForNull
-  public String abbreviation(int periodIndex) {
-    String periodProperty = settings.getString(CoreProperties.TIMEMACHINE_PERIOD_PREFIX + periodIndex);
-    PeriodParameters periodParameters = new PeriodParameters(periodProperty);
-    return abbreviation(periodParameters.getMode(), periodParameters.getParam(), periodParameters.getDate());
-  }
-
-  @CheckForNull
-  public String label(String mode, String param, Date date) {
-    return label(mode, param, convertDate(date), false);
-  }
-
-  @CheckForNull
-  public String label(String mode, String param, String date) {
-    return label(mode, param, date, false);
-  }
-
-  @CheckForNull
-  public String abbreviation(String mode, String param, Date date) {
-    return label(mode, param, convertDate(date), true);
-  }
-
-  @CheckForNull
-  private String label(String mode, @Nullable String param, @Nullable String date, boolean shortLabel) {
-    String label;
-    if (CoreProperties.TIMEMACHINE_MODE_DAYS.equals(mode)) {
-      label = label("over_x_days", shortLabel, param);
-      if (date != null) {
-        label = label("over_x_days_detailed", shortLabel, param, date);
-      }
-    } else if (CoreProperties.TIMEMACHINE_MODE_VERSION.equals(mode)) {
-      label = label("since_version", shortLabel, param);
-      if (date != null) {
-        label = label("since_version_detailed", shortLabel, param, date);
-      }
-    } else if (CoreProperties.TIMEMACHINE_MODE_PREVIOUS_ANALYSIS.equals(mode)) {
-      label = label("since_previous_analysis", shortLabel);
-      if (date != null) {
-        label = label("since_previous_analysis_detailed", shortLabel, date);
-      }
-    } else if (CoreProperties.TIMEMACHINE_MODE_PREVIOUS_VERSION.equals(mode)) {
-      label = label("since_previous_version", shortLabel);
-      if (param != null) {
-        label = label("since_previous_version_detailed", shortLabel, param);
-        if (date != null) {
-          label = label("since_previous_version_detailed", shortLabel, param, date);
-        }
-      }
-    } else if (CoreProperties.TIMEMACHINE_MODE_DATE.equals(mode)) {
-      label = label("since_x", shortLabel, date);
-    } else {
-      throw new IllegalArgumentException("This mode is not supported : " + mode);
-    }
-    return label;
-  }
-
-  private String label(String key, boolean shortLabel, Object... parameters) {
-    String msgKey = key;
-    if (shortLabel) {
-      msgKey += ".short";
-    }
-    return i18n.message(getLocale(), msgKey, null, parameters);
-  }
-
-  @CheckForNull
-  private static String convertDate(Date date) {
+  private static String convertDate(@Nullable Date date) {
     if (date != null) {
       SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy MMM dd");
       return dateFormat.format(date);
@@ -120,8 +56,94 @@ public class Periods {
     return null;
   }
 
-  private static Locale getLocale() {
-    return Locale.ENGLISH;
+  @CheckForNull
+  public String label(int periodIndex) {
+    String periodProperty = settings.getString(TIMEMACHINE_PERIOD_PREFIX + periodIndex);
+    PeriodParameters periodParameters = new PeriodParameters(periodProperty);
+    return label(periodParameters.getMode(), periodParameters.getParam(), periodParameters.getDate());
+  }
+
+  @CheckForNull
+  public String abbreviation(int periodIndex) {
+    String periodProperty = settings.getString(TIMEMACHINE_PERIOD_PREFIX + periodIndex);
+    PeriodParameters periodParameters = new PeriodParameters(periodProperty);
+    return abbreviation(periodParameters.getMode(), periodParameters.getParam(), periodParameters.getDate());
+  }
+
+  @CheckForNull
+  public String label(String mode, @Nullable String param, @Nullable Date date) {
+    return label(mode, param, convertDate(date), false);
+  }
+
+  @CheckForNull
+  public String label(String mode, @Nullable String param, @Nullable String date) {
+    return label(mode, param, date, false);
+  }
+
+  @CheckForNull
+  public String abbreviation(String mode, @Nullable String param, @Nullable Date date) {
+    return label(mode, param, convertDate(date), true);
+  }
+
+  @CheckForNull
+  private String label(String mode, @Nullable String param, @Nullable String date, boolean shortLabel) {
+    switch (mode) {
+      case TIMEMACHINE_MODE_DAYS:
+        return labelForDays(param, date, shortLabel);
+      case TIMEMACHINE_MODE_VERSION:
+        return labelForVersion(param, date, shortLabel);
+      case TIMEMACHINE_MODE_PREVIOUS_ANALYSIS:
+        return labelForPreviousAnalysis(date, shortLabel);
+      case TIMEMACHINE_MODE_PREVIOUS_VERSION:
+        return labelForPreviousVersion(param, date, shortLabel);
+      case TIMEMACHINE_MODE_DATE:
+        return label("since_x", shortLabel, date);
+      default:
+        throw new IllegalArgumentException("This mode is not supported : " + mode);
+    }
+  }
+
+  private String labelForDays(@Nullable String param, @Nullable String date, boolean shortLabel) {
+    if (date == null) {
+      return label("over_x_days", shortLabel, param);
+    }
+    return label("over_x_days_detailed", shortLabel, param, date);
+  }
+
+  private String labelForVersion(@Nullable String param, @Nullable String date, boolean shortLabel) {
+    if (date == null) {
+      return label("since_version", shortLabel, param);
+    }
+    return label("since_version_detailed", shortLabel, param, date);
+  }
+
+  private String labelForPreviousAnalysis(@Nullable String date, boolean shortLabel) {
+    if (date == null) {
+      return label("since_previous_analysis", shortLabel);
+    }
+    return label("since_previous_analysis_detailed", shortLabel, date);
+  }
+
+  private String labelForPreviousVersion(@Nullable String param, @Nullable String date, boolean shortLabel) {
+    if (param == null && date == null) {
+      return label("since_previous_version", shortLabel);
+    }
+    if (param == null) {
+      // Special case when no snapshot for previous version is found. The first analysis is then returned -> Display only the date.
+      return label("since_previous_version_with_only_date", shortLabel, date);
+    }
+    if (date == null) {
+      return label("since_previous_version_detailed", shortLabel, param);
+    }
+    return label("since_previous_version_detailed", shortLabel, param, date);
+  }
+
+  private String label(String key, boolean shortLabel, Object... parameters) {
+    String msgKey = key;
+    if (shortLabel) {
+      msgKey += ".short";
+    }
+    return i18n.message(ENGLISH, msgKey, null, parameters);
   }
 
   private static class PeriodParameters {
@@ -131,19 +153,20 @@ public class Periods {
     private Date date = null;
 
     public PeriodParameters(String periodProperty) {
-      if (CoreProperties.TIMEMACHINE_MODE_PREVIOUS_ANALYSIS.equals(periodProperty) || CoreProperties.TIMEMACHINE_MODE_PREVIOUS_VERSION.equals(periodProperty)) {
+      checkArgument(isNotBlank(periodProperty), "Period property should not be empty");
+      Integer possibleDaysValue = findByDays(periodProperty);
+      Date possibleDatesValue = findByDate(periodProperty);
+      if (TIMEMACHINE_MODE_PREVIOUS_ANALYSIS.equals(periodProperty) || TIMEMACHINE_MODE_PREVIOUS_VERSION.equals(periodProperty)) {
         mode = periodProperty;
-      } else if (findByDays(periodProperty) != null) {
-        mode = CoreProperties.TIMEMACHINE_MODE_DAYS;
-        param = Integer.toString(findByDays(periodProperty));
-      } else if (findByDate(periodProperty) != null) {
-        mode = CoreProperties.TIMEMACHINE_MODE_DATE;
-        date = findByDate(periodProperty);
-      } else if (StringUtils.isNotBlank(periodProperty)) {
-        mode = CoreProperties.TIMEMACHINE_MODE_VERSION;
-        param = periodProperty;
+      } else if (possibleDaysValue != null) {
+        mode = TIMEMACHINE_MODE_DAYS;
+        param = Integer.toString(possibleDaysValue);
+      } else if (possibleDatesValue != null) {
+        mode = TIMEMACHINE_MODE_DATE;
+        date = possibleDatesValue;
       } else {
-        throw new IllegalArgumentException("Unknown period property : " + periodProperty);
+        mode = TIMEMACHINE_MODE_VERSION;
+        param = periodProperty;
       }
     }
 

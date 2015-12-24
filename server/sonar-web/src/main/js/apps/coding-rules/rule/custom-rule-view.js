@@ -1,11 +1,12 @@
 import $ from 'jquery';
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import '../templates';
+import Template from '../templates/rule/coding-rules-custom-rule.hbs';
+import confirmDialog from '../confirm-dialog';
 
 export default Marionette.ItemView.extend({
   tagName: 'tr',
-  template: Templates['coding-rules-custom-rule'],
+  template: Template,
 
   modelEvents: {
     'change': 'render'
@@ -17,9 +18,9 @@ export default Marionette.ItemView.extend({
 
   deleteRule: function () {
     var that = this;
-    window.confirmDialog({
-      title: t('delete'),
-      html: t('are_you_sure'),
+    confirmDialog({
+      title: window.t('delete'),
+      html: window.t('are_you_sure'),
       yesHandler: function () {
         var url = baseUrl + '/api/rules/delete',
             options = { key: that.model.id };
@@ -39,5 +40,3 @@ export default Marionette.ItemView.extend({
     });
   }
 });
-
-

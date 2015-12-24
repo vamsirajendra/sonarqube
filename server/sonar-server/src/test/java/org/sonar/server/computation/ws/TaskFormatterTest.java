@@ -27,6 +27,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
+import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.utils.DateUtils;
 import org.sonar.api.utils.System2;
 import org.sonar.db.DbTester;
@@ -52,8 +53,9 @@ public class TaskFormatterTest {
   @Rule
   public DbTester db = DbTester.create(System2.INSTANCE);
 
+  System2 system2 = mock(System2.class);
   CeLogging ceLogging = mock(CeLogging.class, Mockito.RETURNS_DEEP_STUBS);
-  TaskFormatter underTest = new TaskFormatter(db.getDbClient(), ceLogging);
+  TaskFormatter underTest = new TaskFormatter(db.getDbClient(), ceLogging, system2);
 
   @Test
   public void formatQueue_without_component() {
@@ -76,13 +78,16 @@ public class TaskFormatterTest {
     assertThat(wsTask.hasComponentId()).isFalse();
     assertThat(wsTask.hasComponentKey()).isFalse();
     assertThat(wsTask.hasComponentName()).isFalse();
-    assertThat(wsTask.hasFinishedAt()).isFalse();
+    assertThat(wsTask.hasExecutedAt()).isFalse();
+    assertThat(wsTask.hasStartedAt()).isFalse();
+    assertThat(wsTask.hasExecutionTimeMs()).isFalse();
   }
 
   @Test
   public void formatQueue_with_component_and_other_fields() throws IOException {
     when(ceLogging.getFile(any(LogFileRef.class))).thenReturn(Optional.of(temp.newFile()));
-    db.getDbClient().componentDao().insert(db.getSession(), new ComponentDto().setUuid("COMPONENT_UUID").setKey("COMPONENT_KEY").setName("Component Name"));
+    db.getDbClient().componentDao().insert(db.getSession(), new ComponentDto()
+      .setUuid("COMPONENT_UUID").setKey("COMPONENT_KEY").setName("Component Name").setQualifier(Qualifiers.PROJECT));
 
     CeQueueDto dto = new CeQueueDto();
     dto.setUuid("UUID");
@@ -100,12 +105,12 @@ public class TaskFormatterTest {
     assertThat(wsTask.getComponentId()).isEqualTo("COMPONENT_UUID");
     assertThat(wsTask.getComponentKey()).isEqualTo("COMPONENT_KEY");
     assertThat(wsTask.getComponentName()).isEqualTo("Component Name");
+    assertThat(wsTask.getComponentQualifier()).isEqualTo("TRK");
     assertThat(wsTask.getStatus()).isEqualTo(WsCe.TaskStatus.IN_PROGRESS);
     assertThat(wsTask.getLogs()).isTrue();
     assertThat(wsTask.getSubmitterLogin()).isEqualTo("rob");
-
-    assertThat(wsTask.hasExecutionTimeMs()).isFalse();
-    assertThat(wsTask.hasFinishedAt()).isFalse();
+    assertThat(wsTask.hasExecutionTimeMs()).isTrue();
+    assertThat(wsTask.hasExecutedAt()).isFalse();
   }
 
   @Test
@@ -122,6 +127,23 @@ public class TaskFormatterTest {
     assertThat(wsTask.getComponentId()).isEqualTo("DOES_NOT_EXIST");
     assertThat(wsTask.hasComponentKey()).isFalse();
     assertThat(wsTask.hasComponentName()).isFalse();
+  }
+
+  @Test
+  public void formatQueue_compute_execute_time_if_in_progress() {
+    long startedAt = 1_450_000_001_000L;
+    long now = 1_450_000_003_000L;
+    CeQueueDto dto = new CeQueueDto();
+    dto.setUuid("UUID");
+    dto.setTaskType("TYPE");
+    dto.setStatus(CeQueueDto.Status.IN_PROGRESS);
+    dto.setCreatedAt(1_450_000_000_000L);
+    dto.setStartedAt(startedAt);
+    when(system2.now()).thenReturn(now);
+
+    WsCe.Task wsTask = underTest.formatQueue(db.getSession(), dto);
+
+    assertThat(wsTask.getExecutionTimeMs()).isEqualTo(now-startedAt);
   }
 
   @Test
@@ -154,6 +176,7 @@ public class TaskFormatterTest {
     assertThat(wsTask.getLogs()).isFalse();
     assertThat(wsTask.getSubmittedAt()).isEqualTo(DateUtils.formatDateTime(new Date(1_450_000_000_000L)));
     assertThat(wsTask.getExecutionTimeMs()).isEqualTo(500L);
+    assertThat(wsTask.getAnalysisId()).isEqualTo("123456");
     assertThat(wsTask.getLogs()).isFalse();
   }
 
@@ -186,6 +209,7 @@ public class TaskFormatterTest {
     CeActivityDto activityDto = new CeActivityDto(queueDto);
     activityDto.setStatus(status);
     activityDto.setExecutionTimeMs(500L);
+    activityDto.setSnapshotId(123_456L);
     return activityDto;
   }
 }

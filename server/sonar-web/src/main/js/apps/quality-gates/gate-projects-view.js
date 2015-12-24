@@ -1,10 +1,10 @@
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import 'components/common/select-list';
-import './templates';
+import Template from './templates/quality-gate-detail-projects.hbs';
+import '../../components/common/select-list';
 
 export default Marionette.ItemView.extend({
-  template: Templates['quality-gate-detail-projects'],
+  template: Template,
 
   onRender: function () {
     if (!this.model.isDefault()) {
@@ -25,14 +25,14 @@ export default Marionette.ItemView.extend({
         selectParameter: 'projectId',
         selectParameterValue: 'id',
         labels: {
-          selected: t('quality_gates.projects.with'),
-          deselected: t('quality_gates.projects.without'),
-          all: t('quality_gates.projects.all'),
-          noResults: t('quality_gates.projects.noResults')
+          selected: window.t('quality_gates.projects.with'),
+          deselected: window.t('quality_gates.projects.without'),
+          all: window.t('quality_gates.projects.all'),
+          noResults: window.t('quality_gates.projects.noResults')
         },
         tooltips: {
-          select: t('quality_gates.projects.select_hint'),
-          deselect: t('quality_gates.projects.deselect_hint')
+          select: window.t('quality_gates.projects.select_hint'),
+          deselect: window.t('quality_gates.projects.deselect_hint')
         }
       });
     }
@@ -44,5 +44,3 @@ export default Marionette.ItemView.extend({
     });
   }
 });
-
-

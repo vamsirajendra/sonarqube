@@ -23,11 +23,13 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
+import org.hamcrest.Description;
+import org.hamcrest.TypeSafeMatcher;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.sonar.api.batch.fs.InputFile;
 import org.sonar.api.batch.sensor.highlighting.TypeOfText;
@@ -41,6 +43,9 @@ public class HighlightingMediumTest {
 
   @Rule
   public TemporaryFolder temp = new TemporaryFolder();
+
+  @Rule
+  public ExpectedException exception = ExpectedException.none();
 
   public BatchMediumTester tester = BatchMediumTester.builder()
     .registerPlugin("xoo", new XooPlugin())
@@ -88,27 +93,31 @@ public class HighlightingMediumTest {
   }
 
   @Test
-  public void computeSyntaxHighlightingOnBigFile() throws IOException {
+  public void computeInvalidOffsets() throws IOException {
 
     File baseDir = temp.newFolder();
     File srcDir = new File(baseDir, "src");
     srcDir.mkdir();
 
-    int nbFiles = 100;
-    int ruleCount = 100000;
-    int nblines = 1000;
-    int linesize = ruleCount / nblines;
-    for (int nb = 1; nb <= nbFiles; nb++) {
-      File xooFile = new File(srcDir, "sample" + nb + ".xoo");
-      File xoohighlightingFile = new File(srcDir, "sample" + nb + ".xoo.highlighting");
-      FileUtils.write(xooFile, StringUtils.repeat(StringUtils.repeat("a", linesize) + "\n", nblines));
-      StringBuilder sb = new StringBuilder(16 * ruleCount);
-      for (int i = 0; i < ruleCount; i++) {
-        sb.append(i).append(":").append(i + 1).append(":s\n");
+    File xooFile = new File(srcDir, "sample.xoo");
+    File xoohighlightingFile = new File(srcDir, "sample.xoo.highlighting");
+    FileUtils.write(xooFile, "Sample xoo\ncontent plop");
+    FileUtils.write(xoohighlightingFile, "0:10:s\n18:18:k");
+
+    exception.expect(IllegalStateException.class);
+    exception.expectMessage("Error processing line 2");
+    exception.expectCause(new TypeSafeMatcher<IllegalArgumentException>() {
+      @Override
+      public void describeTo(Description description) {
+        description.appendText("Invalid cause");
       }
-      FileUtils.write(xoohighlightingFile, sb.toString());
-    }
-    long start = System.currentTimeMillis();
+
+      @Override
+      protected boolean matchesSafely(IllegalArgumentException e) {
+        return e.getMessage().contains("Unable to highlight file");
+      }
+    });
+
     TaskResult result = tester.newTask()
       .properties(ImmutableMap.<String, String>builder()
         .put("sonar.projectBaseDir", baseDir.getAbsolutePath())
@@ -119,8 +128,6 @@ public class HighlightingMediumTest {
         .put("sonar.sources", "src")
         .build())
       .start();
-    System.out.println("Duration: " + (System.currentTimeMillis() - start));
-
   }
 
 }

@@ -23,6 +23,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import javax.annotation.CheckForNull;
 import org.apache.commons.lang.StringUtils;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.settings.ImmutableSettings;
@@ -30,25 +34,14 @@ import org.sonar.api.config.Settings;
 import org.sonar.process.ProcessProperties;
 import org.sonar.server.search.IndexField;
 
-import javax.annotation.CheckForNull;
-
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import static java.lang.String.format;
 
 public class NewIndex {
 
+  public static final int DEFAULT_NUMBER_OF_SHARDS = 5;
+
   public void refreshHandledByIndexer() {
     getSettings().put("index.refresh_interval", "-1");
-  }
-
-  public void setShards(Settings settings) {
-    boolean clusterMode = settings.getBoolean(ProcessProperties.CLUSTER_ACTIVATE);
-    if (clusterMode) {
-      getSettings().put(IndexMetaData.SETTING_NUMBER_OF_SHARDS, 4);
-      getSettings().put(IndexMetaData.SETTING_NUMBER_OF_REPLICAS, 1);
-      // else keep defaults (one shard)
-    }
   }
 
   public static class NewIndexType {
@@ -185,6 +178,15 @@ public class NewIndex {
       this.fieldName = fieldName;
     }
 
+    /**
+     * It is recommended to enable doc_values when the non-analyzed field is involved
+     * into aggregations/sorting and only a small fraction of the values is used (high
+     * number of different values)
+     * <ul>
+     *   <li>https://www.elastic.co/blog/found-sizing-elasticsearch</li>
+     *   <li>https://www.elastic.co/guide/en/elasticsearch/guide/current/doc-values.html</li>
+     * </ul>
+     */
     public StringFieldBuilder docValues() {
       this.docValues = true;
       return this;
@@ -303,5 +305,19 @@ public class NewIndex {
 
   public SortedMap<String, NewIndexType> getTypes() {
     return types;
+  }
+
+  public void setShards(Settings settings) {
+    boolean clusterMode = settings.getBoolean(ProcessProperties.CLUSTER_ACTIVATE);
+    int shards = settings.getInt(format("sonar.search.%s.shards", indexName));
+    if (shards == 0) {
+      shards = DEFAULT_NUMBER_OF_SHARDS;
+    }
+    int replicas = settings.getInt(format("sonar.search.%s.replicas", indexName));
+    if (replicas == 0) {
+      replicas = clusterMode ? 1 : 0;
+    }
+    getSettings().put(IndexMetaData.SETTING_NUMBER_OF_SHARDS, shards);
+    getSettings().put(IndexMetaData.SETTING_NUMBER_OF_REPLICAS, replicas);
   }
 }

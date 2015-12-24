@@ -1,9 +1,9 @@
 import _ from 'underscore';
 import BaseFacet from './base-facet';
-import '../templates';
+import Template from '../templates/facets/coding-rules-severity-facet.hbs';
 
 export default BaseFacet.extend({
-  template: Templates['coding-rules-severity-facet'],
+  template: Template,
   severities: ['BLOCKER', 'MINOR', 'CRITICAL', 'INFO', 'MAJOR'],
 
   initialize: function (options) {
@@ -26,7 +26,7 @@ export default BaseFacet.extend({
 
   forbid: function () {
     BaseFacet.prototype.forbid.apply(this, arguments);
-    this.$el.prop('title', t('coding_rules.filters.active_severity.inactive'));
+    this.$el.prop('title', window.t('coding_rules.filters.active_severity.inactive'));
   },
 
   allow: function () {
@@ -41,5 +41,3 @@ export default BaseFacet.extend({
     });
   }
 });
-
-

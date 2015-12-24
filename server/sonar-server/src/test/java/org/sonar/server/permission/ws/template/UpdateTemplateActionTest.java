@@ -26,11 +26,13 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.utils.System2;
 import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.db.DbTester;
+import org.sonar.db.component.ResourceTypesRule;
 import org.sonar.db.permission.PermissionTemplateDto;
 import org.sonar.db.user.GroupDto;
 import org.sonar.server.component.ComponentFinder;
@@ -40,6 +42,7 @@ import org.sonar.server.exceptions.NotFoundException;
 import org.sonar.server.exceptions.UnauthorizedException;
 import org.sonar.server.permission.ws.PermissionDependenciesFinder;
 import org.sonar.server.tester.UserSessionRule;
+import org.sonar.server.usergroups.ws.UserGroupFinder;
 import org.sonar.server.ws.TestRequest;
 import org.sonar.server.ws.TestResponse;
 import org.sonar.server.ws.WsActionTester;
@@ -48,10 +51,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.sonar.db.permission.PermissionTemplateTesting.newPermissionTemplateDto;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_DESCRIPTION;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_ID;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_NAME;
-import static org.sonar.server.permission.ws.WsPermissionParameters.PARAM_PATTERN;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_DESCRIPTION;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_ID;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_NAME;
+import static org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PROJECT_KEY_PATTERN;
 import static org.sonar.test.JsonAssert.assertJson;
 
 public class UpdateTemplateActionTest {
@@ -66,6 +69,7 @@ public class UpdateTemplateActionTest {
   WsActionTester ws;
   DbClient dbClient;
   DbSession dbSession;
+  ResourceTypesRule resourceTypes = new ResourceTypesRule().setRootQualifiers(Qualifiers.PROJECT, Qualifiers.VIEW, "DEV");
 
   PermissionTemplateDto templateDto;
 
@@ -77,7 +81,7 @@ public class UpdateTemplateActionTest {
 
     dbClient = db.getDbClient();
     dbSession = db.getSession();
-    PermissionDependenciesFinder finder = new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient));
+    PermissionDependenciesFinder finder = new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient), new UserGroupFinder(dbClient), resourceTypes);
 
     ws = new WsActionTester(new UpdateTemplateAction(dbClient, userSession, system, finder));
 
@@ -230,7 +234,7 @@ public class UpdateTemplateActionTest {
       request.setParam(PARAM_DESCRIPTION, description);
     }
     if (projectPattern != null) {
-      request.setParam(PARAM_PATTERN, projectPattern);
+      request.setParam(PARAM_PROJECT_KEY_PATTERN, projectPattern);
     }
 
     return request.execute();

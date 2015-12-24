@@ -19,16 +19,15 @@
  */
 package org.sonar.batch.analysis;
 
-import org.sonar.batch.bootstrap.AbstractAnalysisMode;
-
-import org.sonar.batch.mediumtest.FakePluginInstaller;
-import org.sonar.batch.bootstrap.GlobalProperties;
+import java.util.Map;
+import javax.annotation.CheckForNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonar.api.CoreProperties;
 import org.sonar.api.batch.AnalysisMode;
-
-import java.util.Map;
+import org.sonar.batch.bootstrap.AbstractAnalysisMode;
+import org.sonar.batch.bootstrap.GlobalProperties;
+import org.sonar.batch.mediumtest.FakePluginInstaller;
 
 /**
  * @since 4.0
@@ -36,9 +35,11 @@ import java.util.Map;
 public class DefaultAnalysisMode extends AbstractAnalysisMode implements AnalysisMode {
 
   private static final Logger LOG = LoggerFactory.getLogger(DefaultAnalysisMode.class);
+  private static final String KEY_SCAN_ALL = "sonar.scanAllFiles";
 
   private boolean mediumTestMode;
   private boolean notAssociated;
+  private boolean scanAllFiles;
 
   public DefaultAnalysisMode(GlobalProperties globalProps, AnalysisProperties props) {
     init(globalProps.properties(), props.properties());
@@ -50,6 +51,10 @@ public class DefaultAnalysisMode extends AbstractAnalysisMode implements Analysi
 
   public boolean isNotAssociated() {
     return notAssociated;
+  }
+
+  public boolean scanAllFiles() {
+    return scanAllFiles;
   }
 
   private void init(Map<String, String> globalProps, Map<String, String> analysisProps) {
@@ -70,6 +75,8 @@ public class DefaultAnalysisMode extends AbstractAnalysisMode implements Analysi
     issues = CoreProperties.ANALYSIS_MODE_ISSUES.equals(mode) || CoreProperties.ANALYSIS_MODE_PREVIEW.equals(mode);
     mediumTestMode = "true".equals(getPropertyWithFallback(analysisProps, globalProps, FakePluginInstaller.MEDIUM_TEST_ENABLED));
     notAssociated = issues && rootProjectKeyMissing(analysisProps);
+    String scanAllStr = getPropertyWithFallback(analysisProps, globalProps, KEY_SCAN_ALL);
+    scanAllFiles = !issues || "true".equals(scanAllStr);
   }
 
   public void printMode() {
@@ -86,8 +93,12 @@ public class DefaultAnalysisMode extends AbstractAnalysisMode implements Analysi
     if (notAssociated) {
       LOG.info("Local analysis");
     }
+    if (!scanAllFiles) {
+      LOG.info("Scanning only changed files");
+    }
   }
 
+  @CheckForNull
   private static String getPropertyWithFallback(Map<String, String> props1, Map<String, String> props2, String key) {
     if (props1.containsKey(key)) {
       return props1.get(key);

@@ -20,9 +20,7 @@
 package org.sonar.batch.bootstrap;
 
 import com.google.common.collect.ImmutableMap;
-
 import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonar.api.CoreProperties;
@@ -35,7 +33,7 @@ public class GlobalSettings extends Settings {
 
   private static final Logger LOG = LoggerFactory.getLogger(GlobalSettings.class);
 
-  private static final String JDBC_SPECIFIC_MESSAGE = "There is no more DB connection to the SQ database. It will be ignored.";
+  private static final String JDBC_SPECIFIC_MESSAGE = "It will be ignored. There is no longer any DB connection to the SQ database.";
   /**
    * A map of dropped properties as key and specific message to display for that property
    * (what will happen, what should the user do, ...) as a value
@@ -43,8 +41,7 @@ public class GlobalSettings extends Settings {
   private static final Map<String, String> DROPPED_PROPERTIES = ImmutableMap.of(
     "sonar.jdbc.url", JDBC_SPECIFIC_MESSAGE,
     "sonar.jdbc.username", JDBC_SPECIFIC_MESSAGE,
-    "sonar.jdbc.password", JDBC_SPECIFIC_MESSAGE
-    );
+    "sonar.jdbc.password", JDBC_SPECIFIC_MESSAGE);
 
   private final GlobalProperties bootstrapProps;
   private final GlobalRepositories globalReferentials;
@@ -59,14 +56,16 @@ public class GlobalSettings extends Settings {
     this.bootstrapProps = bootstrapProps;
     this.globalReferentials = globalReferentials;
     init();
-    new DroppedPropertyChecker(this, DROPPED_PROPERTIES).checkDroppedProperties();
+    new DroppedPropertyChecker(this.getProperties(), DROPPED_PROPERTIES).checkDroppedProperties();
   }
 
   private void init() {
     addProperties(globalReferentials.globalSettings());
     addProperties(bootstrapProps.properties());
 
-    LOG.info("Server id: " + getString(CoreProperties.SERVER_ID));
+    if (hasKey(CoreProperties.PERMANENT_SERVER_ID)) {
+      LOG.info("Server id: " + getString(CoreProperties.PERMANENT_SERVER_ID));
+    }
   }
 
   @Override

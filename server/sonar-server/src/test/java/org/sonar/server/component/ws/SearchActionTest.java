@@ -20,112 +20,197 @@
 
 package org.sonar.server.component.ws;
 
+import com.google.common.base.Joiner;
+import java.io.IOException;
+import java.io.InputStream;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
+import org.sonar.api.resources.Language;
+import org.sonar.api.resources.Languages;
+import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.server.ws.WebService.Param;
 import org.sonar.api.utils.System2;
-import org.sonar.api.web.UserRole;
+import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.db.DbTester;
-import org.sonar.server.component.ComponentFinder;
-import org.sonar.server.exceptions.NotFoundException;
+import org.sonar.db.component.ComponentDbTester;
+import org.sonar.db.component.ComponentDto;
+import org.sonar.db.component.ResourceTypesRule;
+import org.sonar.server.exceptions.BadRequestException;
+import org.sonar.server.exceptions.ForbiddenException;
+import org.sonar.server.exceptions.UnauthorizedException;
+import org.sonar.server.i18n.I18nRule;
 import org.sonar.server.tester.UserSessionRule;
-import org.sonar.server.ws.WsTester;
-import org.sonar.test.DbTests;
+import org.sonar.server.ws.TestRequest;
+import org.sonar.server.ws.WsActionTester;
+import org.sonarqube.ws.MediaTypes;
+import org.sonarqube.ws.WsComponents.SearchWsResponse;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.sonar.db.component.ComponentTesting.newDirectory;
+import static org.sonar.db.component.ComponentTesting.newFileDto;
+import static org.sonar.db.component.ComponentTesting.newModuleDto;
+import static org.sonar.db.component.ComponentTesting.newProjectDto;
+import static org.sonar.db.component.ComponentTesting.newView;
+import static org.sonar.test.JsonAssert.assertJson;
+import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_LANGUAGE;
+import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_QUALIFIERS;
 
-@Category(DbTests.class)
 public class SearchActionTest {
-
   @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
+  public ExpectedException expectedException = ExpectedException.none();
   @Rule
-  public DbTester dbTester = DbTester.create(System2.INSTANCE);
-
+  public UserSessionRule userSession = UserSessionRule.standalone();
   @Rule
-  public UserSessionRule userSessionRule = UserSessionRule.standalone();
+  public DbTester db = DbTester.create(System2.INSTANCE);
+  ComponentDbTester componentDb = new ComponentDbTester(db);
+  I18nRule i18n = new I18nRule();
 
-  WsTester tester;
+  WsActionTester ws;
+  ResourceTypesRule resourceTypes = new ResourceTypesRule();
+  Languages languages;
 
   @Before
   public void setUp() {
-    dbTester.truncateTables();
-    tester = new WsTester(new ComponentsWs(mock(AppAction.class), new SearchAction(dbTester.getDbClient(), userSessionRule, new ComponentFinder(dbTester.getDbClient()))));
+    userSession.login().setGlobalPermissions(GlobalPermissions.SYSTEM_ADMIN);
+    resourceTypes.setAllQualifiers(Qualifiers.PROJECT, Qualifiers.MODULE, Qualifiers.DIRECTORY, Qualifiers.FILE);
+    languages = mock(Languages.class);
+    when(languages.all()).thenReturn(javaLanguage());
+
+    ws = new WsActionTester(new SearchAction(db.getDbClient(), resourceTypes, i18n, userSession, languages));
+
   }
 
   @Test
-  public void return_projects_from_view() throws Exception {
-    dbTester.prepareDbUnit(getClass(), "shared.xml");
-    userSessionRule.login("john").addProjectUuidPermissions(UserRole.USER, "EFGH");
+  public void search_json_example() {
+    componentDb.insertComponent(newView());
+    ComponentDto project = componentDb.insertComponent(
+      newProjectDto("project-uuid")
+        .setName("Project Name")
+        .setKey("project-key"));
+    ComponentDto module = componentDb.insertComponent(
+      newModuleDto("module-uuid", project)
+        .setName("Module Name")
+        .setKey("module-key"));
+    componentDb.insertComponent(
+      newDirectory(module, "path/to/directoy")
+        .setUuid("directory-uuid")
+        .setKey("directory-key")
+        .setName("Directory Name"));
+    componentDb.insertComponent(
+      newFileDto(module, "file-uuid")
+        .setKey("file-key")
+        .setLanguage("java")
+        .setName("File Name"));
+    db.commit();
 
-    WsTester.TestRequest request = tester.newGetRequest("api/components", "search").setParam("componentUuid", "EFGH").setParam("q", "st");
-    request.execute().assertJson(getClass(), "return_projects_from_view.json");
+    String response = newRequest(Qualifiers.PROJECT, Qualifiers.MODULE, Qualifiers.DIRECTORY, Qualifiers.FILE)
+      .setMediaType(MediaTypes.JSON)
+      .execute()
+      .getInput();
+
+    assertJson(response).isSimilarTo(getClass().getResource("search-components-example.json"));
   }
 
   @Test
-  public void return_projects_from_subview() throws Exception {
-    dbTester.prepareDbUnit(getClass(), "shared.xml");
-    userSessionRule.login("john").addComponentUuidPermission(UserRole.USER, "EFGH", "FGHI");
+  public void search_with_pagination() throws IOException {
+    for (int i = 1; i <= 9; i++) {
+      componentDb.insertComponent(
+        newProjectDto("project-uuid-" + i)
+          .setName("Project Name " + i));
+    }
+    db.commit();
 
-    WsTester.TestRequest request = tester.newGetRequest("api/components", "search").setParam("componentUuid", "FGHI").setParam("q", "st");
-    request.execute().assertJson(getClass(), "return_projects_from_subview.json");
+    InputStream responseStream = newRequest(Qualifiers.PROJECT)
+      .setParam(Param.PAGE, "2")
+      .setParam(Param.PAGE_SIZE, "3")
+      .execute()
+      .getInputStream();
+    SearchWsResponse response = SearchWsResponse.parseFrom(responseStream);
+
+    assertThat(response.getComponentsCount()).isEqualTo(3);
+    assertThat(response.getComponentsList()).extracting("id").containsExactly("project-uuid-4", "project-uuid-5", "project-uuid-6");
   }
 
   @Test
-  public void return_only_authorized_projects_from_view() throws Exception {
-    dbTester.prepareDbUnit(getClass(), "return_only_authorized_projects_from_view.xml");
-    userSessionRule.login("john").addProjectUuidPermissions(UserRole.USER, "EFGH");
+  public void search_with_key_query() throws IOException {
+    componentDb.insertComponent(newProjectDto().setKey("project-_%-key"));
+    componentDb.insertComponent(newProjectDto().setKey("project-key-without-escaped-characters"));
+    db.commit();
 
-    WsTester.TestRequest request = tester.newGetRequest("api/components", "search").setParam("componentUuid", "EFGH").setParam("q", "st");
-    request.execute().assertJson(getClass(), "return_only_authorized_projects_from_view.json");
+    InputStream responseStream = newRequest(Qualifiers.PROJECT)
+      .setParam(Param.TEXT_QUERY, "project-_%")
+      .execute().getInputStream();
+    SearchWsResponse response = SearchWsResponse.parseFrom(responseStream);
+
+    assertThat(response.getComponentsCount()).isEqualTo(1);
+    assertThat(response.getComponentsList()).extracting("key").containsExactly("project-_%-key");
   }
 
   @Test
-  public void return_paged_result() throws Exception {
-    dbTester.prepareDbUnit(getClass(), "shared.xml");
-    userSessionRule.login("john").addProjectUuidPermissions(UserRole.USER, "EFGH");
+  public void search_with_language() throws IOException {
+    componentDb.insertComponent(newProjectDto().setKey("java-project").setLanguage("java"));
+    componentDb.insertComponent(newProjectDto().setKey("cpp-project").setLanguage("cpp"));
+    db.commit();
 
-    WsTester.TestRequest request = tester.newGetRequest("api/components", "search").setParam("componentUuid", "EFGH").setParam("q", "st").setParam(Param.PAGE, "2")
-      .setParam(Param.PAGE_SIZE, "1");
-    request.execute().assertJson(getClass(), "return_paged_result.json");
+    InputStream responseStream = newRequest(Qualifiers.PROJECT)
+      .setParam(PARAM_LANGUAGE, "java")
+      .execute().getInputStream();
+    SearchWsResponse response = SearchWsResponse.parseFrom(responseStream);
+
+    assertThat(response.getComponentsCount()).isEqualTo(1);
+    assertThat(response.getComponentsList().get(0).getKey()).isEqualTo("java-project");
   }
 
   @Test
-  public void return_only_first_page() throws Exception {
-    dbTester.prepareDbUnit(getClass(), "shared.xml");
-    userSessionRule.login("john").addProjectUuidPermissions(UserRole.USER, "EFGH");
+  public void fail_if_unknown_qualifier_provided() {
+    expectedException.expect(BadRequestException.class);
+    expectedException.expectMessage("The 'qualifier' parameter must be one of [BRC, DIR, FIL, TRK]. 'Unknown-Qualifier' was passed.");
 
-    WsTester.TestRequest request = tester.newGetRequest("api/components", "search").setParam("componentUuid", "EFGH").setParam("q", "st").setParam(Param.PAGE, "1")
-      .setParam(Param.PAGE_SIZE, "1");
-    request.execute().assertJson(getClass(), "return_only_first_page.json");
+    newRequest("Unknown-Qualifier").execute();
   }
 
   @Test
-  public void fail_when_search_param_is_too_short() throws Exception {
-    thrown.expect(IllegalArgumentException.class);
-    thrown.expectMessage("Minimum search is 2 characters");
+  public void fail_if_not_logged_in() {
+    expectedException.expect(UnauthorizedException.class);
+    userSession.anonymous();
 
-
-    dbTester.prepareDbUnit(getClass(), "shared.xml");
-    userSessionRule.login("john").addProjectUuidPermissions(UserRole.USER, "EFGH");
-
-    WsTester.TestRequest request = tester.newGetRequest("api/components", "search").setParam("componentUuid", "EFGH").setParam("q", "s");
-    request.execute();
+    newRequest(Qualifiers.PROJECT).execute();
   }
 
   @Test
-  public void fail_when_project_uuid_does_not_exists() throws Exception {
-    thrown.expect(NotFoundException.class);
-    thrown.expectMessage("Component id 'UNKNOWN' not found");
+  public void fail_if_insufficient_privileges() {
+    expectedException.expect(ForbiddenException.class);
+    userSession.login().setGlobalPermissions(GlobalPermissions.SCAN_EXECUTION);
 
-    dbTester.prepareDbUnit(getClass(), "shared.xml");
-    userSessionRule.login("john").addProjectUuidPermissions(UserRole.USER, "EFGH");
+    newRequest(Qualifiers.PROJECT).execute();
+  }
 
-    WsTester.TestRequest request = tester.newGetRequest("api/components", "search").setParam("componentUuid", "UNKNOWN").setParam("q", "st");
-    request.execute();
+  private TestRequest newRequest(String... qualifiers) {
+    return ws.newRequest()
+      .setMediaType(MediaTypes.PROTOBUF)
+      .setParam(PARAM_QUALIFIERS, Joiner.on(",").join(qualifiers));
+  }
+
+  private static Language[] javaLanguage() {
+    return new Language[] {new Language() {
+      @Override
+      public String getKey() {
+        return "java";
+      }
+
+      @Override
+      public String getName() {
+        return "Java";
+      }
+
+      @Override
+      public String[] getFileSuffixes() {
+        return new String[0];
+      }
+    }};
   }
 }

@@ -1,10 +1,13 @@
 import $ from 'jquery';
 import _ from 'underscore';
+import moment from 'moment';
 import BaseFacet from './base-facet';
-import '../templates';
+import Template from '../templates/facets/issues-creation-date-facet.hbs';
+import '../../../components/widgets/barchart.js';
+import { formatMeasure } from '../../../helpers/measures';
 
 export default BaseFacet.extend({
-  template: Templates['issues-creation-date-facet'],
+  template: Template,
 
   events: function () {
     return _.extend(BaseFacet.prototype.events.apply(this, arguments), {
@@ -47,7 +50,7 @@ export default BaseFacet.extend({
     }
     values = values.map(function (v) {
       var format = that.options.app.state.getFacetMode() === 'count' ? 'SHORT_INT' : 'SHORT_WORK_DUR';
-      var text = window.formatMeasure(v.count, format);
+      var text = formatMeasure(v.count, format);
       return _.extend(v, { text: text });
     });
     return this.$('.js-barchart').barchart(values);

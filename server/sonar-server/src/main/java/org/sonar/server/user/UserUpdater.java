@@ -51,6 +51,8 @@ import org.sonar.server.user.index.UserIndexer;
 import org.sonar.server.util.Validation;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static java.util.Arrays.asList;
+import static org.sonar.api.CoreProperties.CORE_AUTHENTICATOR_LOCAL_USERS;
 
 @ServerSide
 public class UserUpdater {
@@ -72,6 +74,7 @@ public class UserUpdater {
   private final UserIndexer userIndexer;
   private final System2 system2;
   private final SecurityRealmFactory realmFactory;
+  private final List<String> technicalUsers;
 
   public UserUpdater(NewUserNotifier newUserNotifier, Settings settings, DbClient dbClient, UserIndexer userIndexer, System2 system2, SecurityRealmFactory realmFactory) {
     this.newUserNotifier = newUserNotifier;
@@ -80,6 +83,7 @@ public class UserUpdater {
     this.userIndexer = userIndexer;
     this.system2 = system2;
     this.realmFactory = realmFactory;
+    this.technicalUsers = asList(settings.getStringArray(CORE_AUTHENTICATOR_LOCAL_USERS));
   }
 
   /**
@@ -95,6 +99,7 @@ public class UserUpdater {
       UserDto existingUser = dbClient.userDao().selectByLogin(dbSession, login);
       if (existingUser == null) {
         saveUser(dbSession, userDto);
+        addDefaultGroup(dbSession, userDto);
       } else {
         if (existingUser.isActive()) {
           throw new IllegalArgumentException(String.format("An active user with login '%s' already exists", login));
@@ -107,6 +112,7 @@ public class UserUpdater {
           .setPasswordConfirmation(newUser.passwordConfirmation());
         updateUserDto(dbSession, updateUser, existingUser);
         updateUser(dbSession, existingUser);
+        addDefaultGroup(dbSession, existingUser);
         isUserReactivated = true;
       }
       dbSession.commit();
@@ -131,12 +137,18 @@ public class UserUpdater {
       notifyNewUser(user.getLogin(), user.getName(), user.getEmail());
       userIndexer.index();
     } finally {
-      dbSession.close();
+      dbClient.closeSession(dbSession);
     }
   }
 
   public void deactivateUserByLogin(String login) {
-    dbClient.userDao().deactivateUserByLogin(login);
+    DbSession dbSession = dbClient.openSession(false);
+    try {
+      dbClient.userTokenDao().deleteByLogin(dbSession, login);
+      dbClient.userDao().deactivateUserByLogin(dbSession, login);
+    } finally {
+      dbClient.closeSession(dbSession);
+    }
     userIndexer.index();
   }
 
@@ -206,7 +218,7 @@ public class UserUpdater {
     String password = updateUser.password();
     String passwordConfirmation = updateUser.passwordConfirmation();
     if (updateUser.isPasswordChanged()) {
-      checkPasswordChangeAllowed(messages);
+      checkPasswordChangeAllowed(updateUser.login(), messages);
       validatePasswords(password, passwordConfirmation, messages);
       setEncryptedPassWord(password, userDto);
     }
@@ -258,8 +270,8 @@ public class UserUpdater {
     }
   }
 
-  private void checkPasswordChangeAllowed(List<Message> messages) {
-    if (realmFactory.hasExternalAuthentication()) {
+  private void checkPasswordChangeAllowed(String login, List<Message> messages) {
+    if (realmFactory.hasExternalAuthentication() && !technicalUsers.contains(login)) {
       messages.add(Message.of("user.password_cant_be_changed_on_external_auth"));
     }
   }
@@ -311,7 +323,6 @@ public class UserUpdater {
     long now = system2.now();
     userDto.setActive(true).setUpdatedAt(now);
     dbClient.userDao().update(dbSession, userDto);
-    addDefaultGroup(dbSession, userDto);
   }
 
   private static void setEncryptedPassWord(String password, UserDto userDto) {

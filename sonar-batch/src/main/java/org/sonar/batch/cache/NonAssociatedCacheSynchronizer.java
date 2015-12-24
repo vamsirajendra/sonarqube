@@ -19,34 +19,36 @@
  */
 package org.sonar.batch.cache;
 
-import org.sonar.batch.rule.ActiveRulesLoader;
-import org.sonar.batch.repository.QualityProfileLoader;
-import org.sonar.batch.protocol.input.QProfile;
-import org.sonar.api.utils.log.Loggers;
-import org.sonar.api.utils.log.Profiler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.sonar.api.utils.log.Loggers;
+import org.sonar.api.utils.log.Profiler;
+import org.sonar.batch.repository.QualityProfileLoader;
+import org.sonar.batch.rule.ActiveRulesLoader;
+import org.sonar.batch.rule.RulesLoader;
+import org.sonarqube.ws.QualityProfiles.SearchWsResponse.QualityProfile;
 
 public class NonAssociatedCacheSynchronizer {
   private static final Logger LOG = LoggerFactory.getLogger(NonAssociatedCacheSynchronizer.class);
 
-  private ProjectCacheStatus cacheStatus;
-  private QualityProfileLoader qualityProfileLoader;
-  private ActiveRulesLoader activeRulesLoader;
+  private final ProjectCacheStatus cacheStatus;
+  private final QualityProfileLoader qualityProfileLoader;
+  private final ActiveRulesLoader activeRulesLoader;
+  private final RulesLoader rulesLoader;
 
-  public NonAssociatedCacheSynchronizer(QualityProfileLoader qualityProfileLoader, ActiveRulesLoader activeRulesLoader, ProjectCacheStatus cacheStatus) {
+  public NonAssociatedCacheSynchronizer(RulesLoader rulesLoader, QualityProfileLoader qualityProfileLoader, ActiveRulesLoader activeRulesLoader, ProjectCacheStatus cacheStatus) {
+    this.rulesLoader = rulesLoader;
     this.qualityProfileLoader = qualityProfileLoader;
     this.activeRulesLoader = activeRulesLoader;
     this.cacheStatus = cacheStatus;
   }
 
   public void execute(boolean force) {
-    Date lastSync = cacheStatus.getSyncStatus(null);
+    Date lastSync = cacheStatus.getSyncStatus();
 
     if (lastSync != null) {
       if (!force) {
@@ -55,38 +57,40 @@ public class NonAssociatedCacheSynchronizer {
       } else {
         LOG.info("-- Found cache [{}], synchronizing data..", lastSync);
       }
-      cacheStatus.delete(null);
     } else {
       LOG.info("-- Cache not found, synchronizing data..");
     }
 
     loadData();
-    saveStatus();
+    cacheStatus.save();
+    LOG.info("-- Succesfully synchronized cache");
   }
 
-  private static Collection<String> getKeys(Collection<QProfile> qProfiles) {
+  private static Collection<String> getKeys(Collection<QualityProfile> qProfiles) {
     List<String> list = new ArrayList<>(qProfiles.size());
-    for (QProfile qp : qProfiles) {
-      list.add(qp.key());
+    for (QualityProfile qp : qProfiles) {
+      list.add(qp.getKey());
     }
 
     return list;
   }
 
-  private void saveStatus() {
-    cacheStatus.save(null);
-    LOG.info("-- Succesfully synchronized cache");
-  }
-
   private void loadData() {
     Profiler profiler = Profiler.create(Loggers.get(ProjectCacheSynchronizer.class));
 
+    profiler.startInfo("Load rules");
+    rulesLoader.load(null);
+    profiler.stopInfo();
+
     profiler.startInfo("Load default quality profiles");
-    Collection<QProfile> qProfiles = qualityProfileLoader.load(null, null);
+    Collection<QualityProfile> qProfiles = qualityProfileLoader.loadDefault(null, null);
     profiler.stopInfo();
 
     profiler.startInfo("Load default active rules");
-    activeRulesLoader.load(getKeys(qProfiles), null);
+    Collection<String> keys = getKeys(qProfiles);
+    for (String k : keys) {
+      activeRulesLoader.load(k, null);
+    }
     profiler.stopInfo();
   }
 }

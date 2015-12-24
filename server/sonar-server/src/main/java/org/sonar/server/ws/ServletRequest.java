@@ -19,19 +19,26 @@
  */
 package org.sonar.server.ws;
 
-import com.google.common.base.Objects;
-import org.jruby.RubyFile;
-import org.sonar.api.server.ws.internal.ValidatingRequest;
-
-import javax.servlet.http.HttpServletRequest;
-
+import com.google.common.collect.ImmutableMap;
+import com.google.common.net.HttpHeaders;
 import java.io.InputStream;
 import java.util.Map;
+import javax.annotation.CheckForNull;
+import javax.servlet.http.HttpServletRequest;
+import org.jruby.RubyFile;
+import org.sonar.api.server.ws.internal.ValidatingRequest;
+import org.sonarqube.ws.MediaTypes;
+
+import static com.google.common.base.Objects.firstNonNull;
 
 public class ServletRequest extends ValidatingRequest {
 
   private final HttpServletRequest source;
   private final Map<String, Object> params;
+  private static final Map<String, String> SUPPORTED_FORMATS = ImmutableMap.of(
+    "JSON", MediaTypes.JSON,
+    "PROTOBUF", MediaTypes.PROTOBUF,
+    "TEXT", MediaTypes.TXT);
 
   public ServletRequest(HttpServletRequest source, Map<String, Object> params) {
     this.source = source;
@@ -45,7 +52,11 @@ public class ServletRequest extends ValidatingRequest {
 
   @Override
   public String getMediaType() {
-    return Objects.firstNonNull(source.getContentType(), "application/octet-stream");
+    return firstNonNull(
+      mediaTypeFromUrl(source.getRequestURI()),
+      firstNonNull(
+        acceptedContentTypeInResponse(),
+        MediaTypes.DEFAULT));
   }
 
   @Override
@@ -82,5 +93,16 @@ public class ServletRequest extends ValidatingRequest {
       url.append("?").append(query);
     }
     return url.toString();
+  }
+
+  @CheckForNull
+  private String acceptedContentTypeInResponse() {
+    return source.getHeader(HttpHeaders.ACCEPT);
+  }
+
+  @CheckForNull
+  private static String mediaTypeFromUrl(String url) {
+    String mediaType = url.substring(url.lastIndexOf('.') + 1);
+    return SUPPORTED_FORMATS.get(mediaType.toUpperCase());
   }
 }

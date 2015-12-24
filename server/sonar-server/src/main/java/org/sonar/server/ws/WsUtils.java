@@ -19,9 +19,11 @@
  */
 package org.sonar.server.ws;
 
+import com.google.common.base.Optional;
 import com.google.protobuf.Message;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
 import org.sonar.api.server.ws.Request;
 import org.sonar.api.server.ws.Response;
@@ -29,7 +31,9 @@ import org.sonar.api.utils.text.JsonWriter;
 import org.sonar.core.util.ProtobufJsonFormat;
 import org.sonar.server.exceptions.BadRequestException;
 import org.sonar.server.exceptions.NotFoundException;
-import org.sonar.server.plugins.MimeTypes;
+import org.sonarqube.ws.MediaTypes;
+
+import static java.lang.String.format;
 
 public class WsUtils {
 
@@ -40,11 +44,11 @@ public class WsUtils {
   public static void writeProtobuf(Message msg, Request request, Response response) throws Exception {
     OutputStream output = response.stream().output();
     try {
-      if (request.getMediaType().equals(MimeTypes.PROTOBUF)) {
-        response.stream().setMediaType(MimeTypes.PROTOBUF);
+      if (request.getMediaType().equals(MediaTypes.PROTOBUF)) {
+        response.stream().setMediaType(MediaTypes.PROTOBUF);
         msg.writeTo(output);
       } else {
-        response.stream().setMediaType(MimeTypes.JSON);
+        response.stream().setMediaType(MediaTypes.JSON);
         try (OutputStreamWriter writer = new OutputStreamWriter(output)) {
           ProtobufJsonFormat.write(msg, JsonWriter.of(writer));
         }
@@ -57,9 +61,9 @@ public class WsUtils {
   /**
    * @throws BadRequestException
    */
-  public static void checkRequest(boolean expression, String message) {
+  public static void checkRequest(boolean expression, String message, Object... messageArguments) {
     if (!expression) {
-      throw new BadRequestException(message);
+      throw new BadRequestException(format(message, messageArguments));
     }
   }
 
@@ -67,11 +71,23 @@ public class WsUtils {
    * @throws NotFoundException if the value if null
    * @return the value
    */
-  public static <T> T checkFound(T value, String message) {
+  public static <T> T checkFound(@Nullable T value, String message, Object... messageArguments) {
     if (value == null) {
-      throw new NotFoundException(message);
+      throw new NotFoundException(format(message, messageArguments));
     }
 
     return value;
+  }
+
+  /**
+   * @throws NotFoundException if the value is not present
+   * @return the value
+   */
+  public static <T> T checkFoundWithOptional(Optional<T> value, String message, Object... messageArguments) {
+    if (!value.isPresent()) {
+      throw new NotFoundException(format(message, messageArguments));
+    }
+
+    return value.get();
   }
 }

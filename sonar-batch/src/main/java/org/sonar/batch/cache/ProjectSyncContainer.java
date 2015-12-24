@@ -19,29 +19,25 @@
  */
 package org.sonar.batch.cache;
 
-import javax.annotation.Nullable;
-
-import org.sonar.batch.repository.ProjectRepositoriesFactoryProvider;
-import org.sonar.batch.analysis.DefaultAnalysisMode;
-import org.sonar.api.CoreProperties;
-import com.google.common.collect.ImmutableMap;
-
+import java.util.HashMap;
 import java.util.Map;
-
+import javax.annotation.Nullable;
+import org.sonar.api.CoreProperties;
 import org.sonar.batch.analysis.AnalysisProperties;
+import org.sonar.batch.analysis.DefaultAnalysisMode;
 import org.sonar.batch.bootstrap.GlobalProperties;
-import org.sonar.batch.repository.ProjectSettingsLoader;
-import org.sonar.batch.repository.DefaultProjectSettingsLoader;
-import org.sonar.batch.rule.ActiveRulesLoader;
-import org.sonar.batch.rule.DefaultActiveRulesLoader;
-import org.sonar.batch.repository.QualityProfileLoader;
-import org.sonar.batch.repository.DefaultQualityProfileLoader;
 import org.sonar.batch.cache.WSLoader.LoadStrategy;
-import org.sonar.batch.repository.user.UserRepositoryLoader;
 import org.sonar.batch.repository.DefaultProjectRepositoriesLoader;
+import org.sonar.batch.repository.DefaultQualityProfileLoader;
 import org.sonar.batch.repository.DefaultServerIssuesLoader;
 import org.sonar.batch.repository.ProjectRepositoriesLoader;
+import org.sonar.batch.repository.QualityProfileLoader;
 import org.sonar.batch.repository.ServerIssuesLoader;
+import org.sonar.batch.repository.user.UserRepositoryLoader;
+import org.sonar.batch.rule.ActiveRulesLoader;
+import org.sonar.batch.rule.DefaultActiveRulesLoader;
+import org.sonar.batch.rule.DefaultRulesLoader;
+import org.sonar.batch.rule.RulesLoader;
 import org.sonar.core.platform.ComponentContainer;
 
 public class ProjectSyncContainer extends ComponentContainer {
@@ -68,8 +64,12 @@ public class ProjectSyncContainer extends ComponentContainer {
     }
   }
 
-  private static DefaultAnalysisMode createIssuesAnalysisMode() {
-    Map<String, String> props = ImmutableMap.of(CoreProperties.ANALYSIS_MODE, CoreProperties.ANALYSIS_MODE_ISSUES);
+  private static DefaultAnalysisMode createIssuesAnalysisMode(@Nullable String projectKey) {
+    Map<String, String> props = new HashMap<>();
+    props.put(CoreProperties.ANALYSIS_MODE, CoreProperties.ANALYSIS_MODE_ISSUES);
+    if (projectKey != null) {
+      props.put(CoreProperties.PROJECT_KEY_PROPERTY, projectKey);
+    }
     GlobalProperties globalProps = new GlobalProperties(props);
     AnalysisProperties analysisProps = new AnalysisProperties(props);
     return new DefaultAnalysisMode(globalProps, analysisProps);
@@ -77,16 +77,17 @@ public class ProjectSyncContainer extends ComponentContainer {
 
   private void addComponents() {
     add(new StrategyWSLoaderProvider(LoadStrategy.SERVER_ONLY),
+      new ProjectKeySupplier(projectKey),
       projectKey != null ? ProjectCacheSynchronizer.class : NonAssociatedCacheSynchronizer.class,
       UserRepositoryLoader.class,
-      new ProjectRepositoriesFactoryProvider(projectKey),
-      createIssuesAnalysisMode());
+      new ProjectPersistentCacheProvider(),
+      createIssuesAnalysisMode(projectKey));
 
     addIfMissing(DefaultProjectCacheStatus.class, ProjectCacheStatus.class);
     addIfMissing(DefaultProjectRepositoriesLoader.class, ProjectRepositoriesLoader.class);
     addIfMissing(DefaultServerIssuesLoader.class, ServerIssuesLoader.class);
     addIfMissing(DefaultQualityProfileLoader.class, QualityProfileLoader.class);
+    addIfMissing(DefaultRulesLoader.class, RulesLoader.class);
     addIfMissing(DefaultActiveRulesLoader.class, ActiveRulesLoader.class);
-    addIfMissing(DefaultProjectSettingsLoader.class, ProjectSettingsLoader.class);
   }
 }

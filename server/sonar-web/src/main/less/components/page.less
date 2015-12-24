@@ -2,11 +2,17 @@
 @import (reference) "../mixins";
 @import (reference) "../init/links";
 
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+}
 
 .page {
   .clearfix;
   position: relative;
-  padding: 10px;
+  padding: 10px 20px;
 }
 
 .page-container {
@@ -14,8 +20,15 @@
 }
 
 .page-wrapper {
-  min-height: ~"calc(100vh - @{pageFooterHeight})";
-  .box-sizing(border-box);
+  box-sizing: border-box;
+  flex: 1 0 auto;
+}
+
+.page-wrapper-simple {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 100px 0;
 }
 
 .page-wrapper-global {
@@ -27,17 +40,21 @@
 }
 
 .page-simple {
-  max-width: 400px;
-  margin: 10vh auto;
+  width: 400px;
   padding: 40px;
   border: 1px solid @barBorderColor;
   background-color: #fff;
-  text-align: left;
 }
 
 .page-header {
   .clearfix;
   margin-bottom: 10px;
+
+  .spinner {
+    position: relative;
+    top: 3px;
+    margin-left: 8px;
+  }
 }
 
 .page-title {
@@ -48,6 +65,8 @@
 
 .page-actions {
   float: right;
+  margin-bottom: 10px;
+  margin-left: 10px;
 
   .badge {
     margin: 3px 0;
@@ -55,7 +74,6 @@
 }
 
 .page-description {
-  float: left;
   clear: left;
   font-size: @smallFontSize;
   line-height: 1.5;
@@ -66,7 +84,7 @@
   padding: 10px;
   line-height: 1.5;
   border-top: 1px solid @barBorderColor;
-  .box-sizing(border-box);
+  box-sizing: border-box;
   background-color: @barBackgroundColor;
   color: @baseFontColorLight;
   font-size: @smallFontSize;
@@ -74,23 +92,5 @@
 
   a {
     .link-base-color;
-  }
-}
-
-@supports (display: flex) {
-  body {
-    min-height: 100vh;
-    display: flex;
-    flex-flow: column nowrap;
-    justify-content: space-between;
-  }
-
-  .page-wrapper {
-    flex: 1;
-    min-height: 0 !important;
-  }
-
-  .page-simple {
-    margin-bottom: 0;
   }
 }

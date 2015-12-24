@@ -19,50 +19,44 @@
  */
 package org.sonar.batch.analysis;
 
-import org.sonar.batch.analysis.AnalysisWSLoaderProvider;
-
+import com.google.common.collect.ImmutableMap;
+import org.assertj.core.util.Maps;
+import org.junit.Test;
+import org.sonar.api.batch.AnalysisMode;
+import org.sonar.batch.bootstrap.BatchWsClient;
 import org.sonar.batch.cache.WSLoader;
 import org.sonar.batch.cache.WSLoader.LoadStrategy;
-import org.sonar.batch.analysis.AnalysisProperties;
-import org.sonar.api.batch.AnalysisMode;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.sonar.batch.bootstrap.ServerClient;
 import org.sonar.home.cache.PersistentCache;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class AnalysisWSLoaderProviderTest {
-  @Mock
-  private PersistentCache cache;
 
-  @Mock
-  private ServerClient client;
+  PersistentCache cache = mock(PersistentCache.class);
+  BatchWsClient wsClient = mock(BatchWsClient.class);
+  AnalysisMode mode = mock(AnalysisMode.class);
 
-  @Mock
-  private AnalysisMode mode;
-
-  private AnalysisWSLoaderProvider loaderProvider;
-  private Map<String, String> propMap;
-  private AnalysisProperties props;
-
-  @Before
-  public void setUp() {
-    MockitoAnnotations.initMocks(this);
-    loaderProvider = new AnalysisWSLoaderProvider();
-    propMap = new HashMap<>();
-  }
+  AnalysisWSLoaderProvider underTest = new AnalysisWSLoaderProvider();
 
   @Test
   public void testDefault() {
-    props = new AnalysisProperties(propMap, null);
+    WSLoader loader = underTest.provide(mode, cache, wsClient, new AnalysisProperties(Maps.<String, String>newHashMap()));
+    assertThat(loader.getDefaultStrategy()).isEqualTo(LoadStrategy.SERVER_ONLY);
+  }
 
-    WSLoader loader = loaderProvider.provide(props, mode, cache, client);
-    assertThat(loader.getStrategy()).isEqualTo(LoadStrategy.SERVER_ONLY);
+  @Test
+  public void no_cache_by_default_in_issues_mode() {
+    when(mode.isIssues()).thenReturn(true);
+    WSLoader loader = underTest.provide(mode, cache, wsClient, new AnalysisProperties(Maps.<String, String>newHashMap()));
+    assertThat(loader.getDefaultStrategy()).isEqualTo(LoadStrategy.SERVER_ONLY);
+  }
+
+  @Test
+  public void enable_cache_in_issues_mode() {
+    when(mode.isIssues()).thenReturn(true);
+    WSLoader loader = underTest.provide(mode, cache, wsClient, new AnalysisProperties(ImmutableMap.of(AnalysisWSLoaderProvider.SONAR_USE_WS_CACHE, "true")));
+    assertThat(loader.getDefaultStrategy()).isEqualTo(LoadStrategy.CACHE_ONLY);
   }
 }

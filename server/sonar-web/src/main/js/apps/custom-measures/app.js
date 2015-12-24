@@ -15,13 +15,13 @@ var App = new Marionette.Application(),
 
       // Collection
       this.customMeasures = new CustomMeasures({
-        projectId: options.projectId
+        projectId: options.component.id
       });
 
       // Header View
       this.headerView = new HeaderView({
         collection: this.customMeasures,
-        projectId: options.projectId
+        projectId: options.component.id
       });
       this.layout.headerRegion.show(this.headerView);
 
@@ -42,10 +42,8 @@ var App = new Marionette.Application(),
     };
 
 App.on('start', function (options) {
-  window.requestMessages().done(function () {
-    init.call(App, options);
-  });
+  init.call(App, options);
 });
 
-export default App;
+window.sonarqube.appStarted.then(options => App.start(options));
 

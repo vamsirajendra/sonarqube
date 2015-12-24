@@ -5,7 +5,7 @@ export default Backbone.Collection.extend({
   model: Group,
 
   url: function () {
-    return baseUrl + '/api/usergroups/search';
+    return baseUrl + '/api/user_groups/search';
   },
 
   parse: function (r) {
@@ -18,7 +18,7 @@ export default Backbone.Collection.extend({
   fetch: function (options) {
     var d = (options && options.data) || {};
     this.q = d.q;
-    return this._super(options);
+    return Backbone.Collection.prototype.fetch.call(this, options);
   },
 
   fetchMore: function () {

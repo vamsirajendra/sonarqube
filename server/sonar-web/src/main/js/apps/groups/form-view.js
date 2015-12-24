@@ -1,21 +1,21 @@
-import ModalForm from 'components/common/modal-form';
-import './templates';
+import ModalForm from '../../components/common/modal-form';
+import Template from './templates/groups-form.hbs';
 
 export default ModalForm.extend({
-  template: Templates['groups-form'],
+  template: Template,
 
   onRender: function () {
-    this._super();
+    ModalForm.prototype.onRender.apply(this, arguments);
     this.$('[data-toggle="tooltip"]').tooltip({ container: 'body', placement: 'bottom' });
   },
 
   onDestroy: function () {
-    this._super();
+    ModalForm.prototype.onDestroy.apply(this, arguments);
     this.$('[data-toggle="tooltip"]').tooltip('destroy');
   },
 
-  onFormSubmit: function (e) {
-    this._super(e);
+  onFormSubmit: function () {
+    ModalForm.prototype.onFormSubmit.apply(this, arguments);
     this.sendRequest();
   }
 });

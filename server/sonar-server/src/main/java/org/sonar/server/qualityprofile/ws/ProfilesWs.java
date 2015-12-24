@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+
 package org.sonar.server.qualityprofile.ws;
 
 import com.google.common.io.Resources;
@@ -29,25 +30,52 @@ import org.sonar.api.server.ws.WebService;
  */
 public class ProfilesWs implements WebService {
 
+  public static final String API_ENDPOINT = "api/profiles";
+
+  private final OldRestoreAction restoreAction;
+
+  public ProfilesWs(OldRestoreAction restoreAction) {
+    this.restoreAction = restoreAction;
+  }
+
   @Override
   public void define(Context context) {
-    NewController controller = context.createController("api/profiles")
-      .setDescription("Former quality profiles web service");
+    NewController controller = context.createController(API_ENDPOINT)
+      .setDescription("Old Quality Profiles. Deprecated since 5.2")
+      .setSince("4.4");
 
+
+    restoreAction.define(controller);
     defineListAction(controller);
     defineIndexAction(controller);
-    defineBackupAction(controller);
-    defineRestoreAction(controller);
-    defineDestroyAction(controller);
-    defineSetAsDefaultAction(controller);
 
     controller.done();
   }
 
+  private static void defineIndexAction(NewController controller) {
+    WebService.NewAction action = controller.createAction("index")
+      .setDescription("Get a profile.")
+      .setSince("3.3")
+      .setDeprecatedSince("5.2")
+      .setHandler(RailsHandler.INSTANCE)
+      .setResponseExample(Resources.getResource(ProfilesWs.class, "example-index.json"));
+
+    action.createParam("language")
+      .setDescription("Profile language")
+      .setRequired(true)
+      .setExampleValue("java");
+    action.createParam("name")
+      .setDescription("Profile name. If no profile name is given, default profile for the given language will be returned")
+      .setRequired(true)
+      .setExampleValue("Sonar way");
+    RailsHandler.addFormatParam(action);
+  }
+
   private static void defineListAction(NewController controller) {
     WebService.NewAction action = controller.createAction("list")
-      .setDescription("Get a list of profiles")
+      .setDescription("Get a list of profiles.")
       .setSince("3.3")
+      .setDeprecatedSince("5.2")
       .setHandler(RailsHandler.INSTANCE)
       .setResponseExample(Resources.getResource(ProfilesWs.class, "example-list.json"));
 
@@ -59,86 +87,4 @@ public class ProfilesWs implements WebService {
       .setExampleValue("org.codehaus.sonar:sonar");
     RailsHandler.addJsonOnlyFormatParam(action);
   }
-
-  private static void defineIndexAction(NewController controller) {
-    WebService.NewAction action = controller.createAction("index")
-      .setDescription("Get a profile")
-      .setSince("3.3")
-      .setHandler(RailsHandler.INSTANCE)
-      .setResponseExample(Resources.getResource(ProfilesWs.class, "example-index.json"));
-
-    action.createParam("language")
-      .setDescription("Profile language")
-      .setRequired(true)
-      .setExampleValue("java");
-    action.createParam("name")
-      .setDescription("Profile name. If no profile name is given, default profile for the given language will be returned")
-      .setExampleValue("Sonar way");
-    RailsHandler.addFormatParam(action);
-  }
-
-  private static void defineBackupAction(NewController controller) {
-    WebService.NewAction action = controller.createAction("backup")
-      .setDescription("Backup a quality profile. Requires Administer Quality Profiles permission")
-      .setSince("3.1")
-      .setPost(true)
-      .setHandler(RailsHandler.INSTANCE);
-
-    action.createParam("language")
-      .setDescription("Profile language")
-      .setRequired(true)
-      .setExampleValue("java");
-    action.createParam("name")
-      .setDescription("Profile name. If not set, the default profile for the selected language is used")
-      .setExampleValue("Sonar way");
-    RailsHandler.addFormatParam(action);
-  }
-
-  private static void defineRestoreAction(NewController controller) {
-    WebService.NewAction action = controller.createAction("restore")
-      .setDescription("Restore a quality profile backup. Requires Administer Quality Profiles permission")
-      .setSince("3.1")
-      .setPost(true)
-      .setHandler(RailsHandler.INSTANCE);
-
-    action.createParam("backup")
-      .setRequired(true)
-      .setDescription("Path to the file containing the backup (HTML format)");
-    RailsHandler.addJsonOnlyFormatParam(action);
-  }
-
-  private static void defineDestroyAction(NewController controller) {
-    WebService.NewAction action = controller.createAction("destroy")
-      .setDescription("Delete a quality profile. Requires Administer Quality Profiles permission")
-      .setSince("3.3")
-      .setPost(true)
-      .setHandler(RailsHandler.INSTANCE);
-
-    action.createParam("language")
-      .setDescription("Profile language")
-      .setRequired(true)
-      .setExampleValue("java");
-    action.createParam("name")
-      .setDescription("Profile name")
-      .setRequired(true)
-      .setExampleValue("Sonar way");
-  }
-
-  private static void defineSetAsDefaultAction(NewController controller) {
-    WebService.NewAction action = controller.createAction("set_as_default")
-      .setDescription("Set a quality profile as Default. Requires Administer Quality Profiles permission")
-      .setSince("3.3")
-      .setPost(true)
-      .setHandler(RailsHandler.INSTANCE);
-
-    action.createParam("language")
-      .setDescription("Profile language")
-      .setRequired(true)
-      .setExampleValue("java");
-    action.createParam("name")
-      .setDescription("Profile name")
-      .setRequired(true)
-      .setExampleValue("Sonar way");
-  }
-
 }

@@ -1,10 +1,10 @@
 import $ from 'jquery';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/api-documentation-action.hbs';
 
 export default Marionette.ItemView.extend({
   className: 'panel panel-vertical',
-  template: Templates['api-documentation-action'],
+  template: Template,
 
   modelEvents: {
     'change': 'render'
@@ -16,13 +16,14 @@ export default Marionette.ItemView.extend({
   },
 
   initialize: function () {
-    this.listenTo(this.options.state, 'change:query', this.toggleHidden);
+    this.listenTo(this.options.state, 'change', this.toggleHidden);
   },
 
   onRender: function () {
     this.$el.attr('data-web-service', this.model.get('path'));
     this.$el.attr('data-action', this.model.get('key'));
     this.toggleHidden();
+    this.$('[data-toggle="tooltip"]').tooltip({ container: 'body', placement: 'bottom' });
   },
 
   onShowResponseExampleClick: function (e) {
@@ -46,6 +47,6 @@ export default Marionette.ItemView.extend({
 
   toggleHidden: function () {
     var test = this.model.get('path') + '/' + this.model.get('key');
-    this.$el.toggleClass('hidden', !this.options.state.match(test));
+    this.$el.toggleClass('hidden', !this.options.state.match(test, this.model.get('internal')));
   }
 });

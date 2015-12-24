@@ -19,17 +19,101 @@
  */
 package org.sonar.server.computation.step;
 
-import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
+import com.google.common.base.Predicate;
 import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.sonar.server.computation.container.ComputeEngineContainer;
+import org.sonar.server.devcockpit.DevCockpitBridge;
+
+import static com.google.common.collect.FluentIterable.from;
 
 /**
  * Ordered list of steps classes and instances to be executed for batch processing
  */
-public class ReportComputationSteps implements ComputationSteps {
+public class ReportComputationSteps extends AbstractComputationSteps {
+
+  private static final List<Class<? extends ComputationStep>> STEPS = Arrays.asList(
+    ExtractReportStep.class,
+    LogScannerContextStep.class,
+
+    // Builds Component tree
+    LoadReportAnalysisMetadataHolderStep.class,
+    BuildComponentTreeStep.class,
+    ValidateProjectStep.class,
+
+    LoadDebtModelStep.class,
+    LoadQualityProfilesStep.class,
+
+    // load project related stuffs
+    LoadQualityGateStep.class,
+    LoadPeriodsStep.class,
+
+    // load duplications related stuff
+    LoadDuplicationsFromReportStep.class,
+    LoadCrossProjectDuplicationsRepositoryStep.class,
+
+    // data computation
+    SizeMeasuresStep.class,
+    NewCoverageMeasuresStep.class,
+    CoverageMeasuresStep.class,
+    CommentMeasuresStep.class,
+    CustomMeasuresCopyStep.class,
+    DuplicationMeasuresStep.class,
+    DuplicationDataMeasuresStep.class,
+    LanguageDistributionMeasuresStep.class,
+    UnitTestMeasuresStep.class,
+    ComplexityMeasuresStep.class,
+
+    LoadMeasureComputersStep.class,
+    ExecuteVisitorsStep.class,
+
+    // Must be executed after computation of all measures
+    ComputeMeasureVariationsStep.class,
+
+    // Must be executed after computation of differential measures
+    QualityGateMeasuresStep.class,
+    ComputeQProfileMeasureStep.class,
+    // Must be executed after computation of quality profile measure
+    QualityProfileEventsStep.class,
+
+    // Must be executed after computation of quality gate measure
+    QualityGateEventsStep.class,
+
+    // Persist data
+    PersistComponentsStep.class,
+    PersistSnapshotsStep.class,
+    PersistDevelopersStep.class,
+    PersistMeasuresStep.class,
+    PersistIssuesStep.class,
+    PersistProjectLinksStep.class,
+    PersistEventsStep.class,
+    PersistFileSourcesStep.class,
+    PersistTestsStep.class,
+    PersistCrossProjectDuplicationIndexStep.class,
+
+    // Switch snapshot and purge
+    SwitchSnapshotStep.class,
+    IndexComponentsStep.class,
+    PurgeDatastoresStep.class,
+    ApplyPermissionsStep.class,
+
+    // ES indexing is done after all db changes
+    IndexIssuesStep.class,
+    IndexTestsStep.class,
+
+    // notifications are sent at the end, so that webapp displays up-to-date information
+    SendIssueNotificationsStep.class,
+
+    PublishTaskResultStep.class
+    );
+
+  private final ComputeEngineContainer computeEngineContainer;
+
+  public ReportComputationSteps(ComputeEngineContainer computeEngineContainer) {
+    super(computeEngineContainer);
+    this.computeEngineContainer = computeEngineContainer;
+  }
 
   /**
    * List of all {@link org.sonar.server.computation.step.ComputationStep},
@@ -37,90 +121,19 @@ public class ReportComputationSteps implements ComputationSteps {
    */
   @Override
   public List<Class<? extends ComputationStep>> orderedStepClasses() {
-    return Arrays.asList(
-      ExtractReportStep.class,
-      LogScannerContextStep.class,
-
-      // Builds Component tree
-      BuildComponentTreeStep.class,
-      ValidateProjectStep.class,
-
-      LoadDebtModelStep.class,
-      LoadQualityProfilesStep.class,
-
-      // load project related stuffs
-      LoadQualityGateStep.class,
-      LoadPeriodsStep.class,
-
-      // data computation
-      SizeMeasuresStep.class,
-      NewCoverageMeasuresStep.class,
-      CoverageMeasuresStep.class,
-      CommentMeasuresStep.class,
-      CustomMeasuresCopyStep.class,
-      DuplicationMeasuresStep.class,
-      LanguageDistributionMeasuresStep.class,
-      UnitTestMeasuresStep.class,
-      ComplexityMeasuresStep.class,
-
-      LoadMeasureComputersStep.class,
-      ExecuteVisitorsStep.class,
-
-      // Must be executed after computation of all measures
-      ComputeMeasureVariationsStep.class,
-
-      // Must be executed after computation of differential measures
-      QualityGateMeasuresStep.class,
-      ComputeQProfileMeasureStep.class,
-      // Must be executed after computation of quality profile measure
-      QualityProfileEventsStep.class,
-
-      // Must be executed after computation of quality gate measure
-      QualityGateEventsStep.class,
-
-      // Persist data
-      PersistComponentsStep.class,
-      PersistSnapshotsStep.class,
-      PersistMeasuresStep.class,
-      PersistIssuesStep.class,
-      PersistProjectLinksStep.class,
-      PersistEventsStep.class,
-      PersistDuplicationsStep.class,
-      PersistFileSourcesStep.class,
-      PersistTestsStep.class,
-
-      // Switch snapshot and purge
-      SwitchSnapshotStep.class,
-      IndexComponentsStep.class,
-      PurgeDatastoresStep.class,
-      ApplyPermissionsStep.class,
-
-      // ES indexing is done after all db changes
-      IndexIssuesStep.class,
-      IndexTestsStep.class,
-
-      // notifications are sent at the end, so that webapp displays up-to-date information
-      SendIssueNotificationsStep.class);
+    return from(STEPS)
+      .filter(new AllowPersistDevelopersStepIfDevCockpitPluginInstalled())
+      .toList();
   }
 
-  private final ComputeEngineContainer computeEngineContainer;
+  private class AllowPersistDevelopersStepIfDevCockpitPluginInstalled implements Predicate<Class<? extends ComputationStep>> {
 
-  public ReportComputationSteps(ComputeEngineContainer computeEngineContainer) {
-    this.computeEngineContainer = computeEngineContainer;
-  }
+    private final boolean devCockpitIsInstalled = computeEngineContainer.getComponentByType(DevCockpitBridge.class) != null;
 
-  @Override
-  public Iterable<ComputationStep> instances() {
-    return Iterables.transform(orderedStepClasses(), new Function<Class<? extends ComputationStep>, ComputationStep>() {
-      @Override
-      public ComputationStep apply(@Nonnull Class<? extends ComputationStep> input) {
-        ComputationStep computationStepType = computeEngineContainer.getComponentByType(input);
-        if (computationStepType == null) {
-          throw new IllegalStateException(String.format("Component not found: %s", input));
-        }
-        return computationStepType;
-      }
-    });
+    @Override
+    public boolean apply(@Nonnull Class<? extends ComputationStep> input) {
+      return devCockpitIsInstalled || !input.equals(PersistDevelopersStep.class);
+    }
   }
 
 }

@@ -29,25 +29,19 @@ public class CeQueueModule extends Module {
   @Override
   protected void configureModule() {
     add(
-        // queue state
-        CeQueueImpl.class,
+      // queue state
+      CeQueueImpl.class,
 
-        // queue monitoring
-        CEQueueStatusImpl.class,
-        ComputeEngineQueueMonitor.class,
+      // queue monitoring
+      CEQueueStatusImpl.class,
+      ComputeEngineQueueMonitor.class,
 
-        // CE queue processing
-        CeProcessingSchedulerExecutorServiceImpl.class,
-        CeWorkerRunnableImpl.class,
-        CeProcessingSchedulerImpl.class,
+      // queue cleaning
+      CeQueueCleaner.class,
+      CleanReportQueueListener.class,
+      ReportFiles.class,
 
-        // queue cleaning
-        CeQueueCleaner.class,
-        CleanReportQueueListener.class,
-        ReportFiles.class,
-
-        // init queue state and queue processing
-        CeQueueInitializer.class
-    );
+      // init queue state and queue processing
+      CeQueueInitializer.class);
   }
 }

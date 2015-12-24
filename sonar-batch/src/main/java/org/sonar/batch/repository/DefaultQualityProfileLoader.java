@@ -19,32 +19,70 @@
  */
 package org.sonar.batch.repository;
 
+import org.sonar.api.utils.MessageException;
+
+import org.sonarqube.ws.QualityProfiles.SearchWsResponse;
+import org.sonar.batch.util.BatchUtils;
+import org.apache.commons.io.IOUtils;
+import org.sonarqube.ws.QualityProfiles.SearchWsResponse.QualityProfile;
+import org.apache.commons.lang.mutable.MutableBoolean;
+import org.sonar.batch.cache.WSLoaderResult;
+import org.sonar.batch.cache.WSLoader;
+
 import javax.annotation.Nullable;
 
-import org.sonar.batch.protocol.input.ProjectRepositories;
-import org.sonar.batch.protocol.input.QProfile;
-
-import java.util.Collection;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 
 public class DefaultQualityProfileLoader implements QualityProfileLoader {
+  private static final String WS_URL = "/api/qualityprofiles/search.protobuf";
 
-  private ProjectRepositoriesFactory projectRepositoriesFactory;
+  private WSLoader wsLoader;
 
-  public DefaultQualityProfileLoader(ProjectRepositoriesFactory projectRepositoriesFactory) {
-    this.projectRepositoriesFactory = projectRepositoriesFactory;
+  public DefaultQualityProfileLoader(WSLoader wsLoader) {
+    this.wsLoader = wsLoader;
   }
 
   @Override
-  public Collection<QProfile> load(@Nullable String projectKey, @Nullable String sonarProfile) {
-    ProjectRepositories pr = projectRepositoriesFactory.create();
-    validate(pr.qProfiles());
-    return pr.qProfiles();
+  public List<QualityProfile> loadDefault(@Nullable String profileName, @Nullable MutableBoolean fromCache) {
+    String url = WS_URL + "?defaults=true";
+    if (profileName != null) {
+      url += "&profileName=" + BatchUtils.encodeForUrl(profileName);
+    }
+    return loadResource(url, fromCache);
   }
 
-  private static void validate(Collection<QProfile> profiles) {
-    if (profiles == null || profiles.isEmpty()) {
-      throw new IllegalStateException("No quality profiles has been found this project, you probably don't have any language plugin suitable for this analysis.");
+  @Override
+  public List<QualityProfile> load(String projectKey, @Nullable String profileName, @Nullable MutableBoolean fromCache) {
+    String url = WS_URL + "?projectKey=" + BatchUtils.encodeForUrl(projectKey);
+    if (profileName != null) {
+      url += "&profileName=" + BatchUtils.encodeForUrl(profileName);
     }
+    return loadResource(url, fromCache);
+  }
+
+  private List<QualityProfile> loadResource(String url, @Nullable MutableBoolean fromCache) {
+    WSLoaderResult<InputStream> result = wsLoader.loadStream(url);
+    if (fromCache != null) {
+      fromCache.setValue(result.isFromCache());
+    }
+    InputStream is = result.get();
+    SearchWsResponse profiles = null;
+
+    try {
+      profiles = SearchWsResponse.parseFrom(is);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to load quality profiles", e);
+    } finally {
+      IOUtils.closeQuietly(is);
+    }
+
+    List<QualityProfile> profilesList = profiles.getProfilesList();
+    if (profilesList == null || profilesList.isEmpty()) {
+      throw MessageException.of("No quality profiles have been found, you probably don't have any language plugin installed.");
+    }
+    return profilesList;
   }
 
 }

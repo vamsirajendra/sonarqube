@@ -2,10 +2,10 @@ import $ from 'jquery';
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
 import Issue from './models/issue';
-import './templates';
+import Template from './templates/manual-issue.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['manual-issue'],
+  template: Template,
 
   events: {
     'submit .js-manual-issue-form': 'formSubmit',
@@ -70,7 +70,7 @@ export default Marionette.ItemView.extend({
   },
 
   serializeData: function () {
-    return _.extend(this._super(), {
+    return _.extend(Marionette.ItemView.prototype.serializeData.apply(this, arguments), {
       rules: _.sortBy(this.rules, 'name')
     });
   }

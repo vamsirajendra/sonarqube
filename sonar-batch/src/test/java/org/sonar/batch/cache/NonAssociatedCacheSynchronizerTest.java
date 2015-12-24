@@ -19,27 +19,28 @@
  */
 package org.sonar.batch.cache;
 
-import static org.mockito.Mockito.when;
-import org.sonar.batch.protocol.input.ActiveRule;
 import com.google.common.collect.ImmutableList;
-import org.sonar.batch.protocol.input.QProfile;
-import org.junit.Test;
-
 import java.util.Date;
-
-import static org.mockito.Mockito.mock;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.sonar.batch.repository.QualityProfileLoader;
+import org.sonar.batch.rule.ActiveRulesLoader;
+import org.sonar.batch.rule.LoadedActiveRule;
+import org.sonar.batch.rule.RulesLoader;
+import org.sonarqube.ws.QualityProfiles.SearchWsResponse.QualityProfile;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import org.mockito.MockitoAnnotations;
-import org.junit.Before;
-import org.mockito.Mock;
-import org.sonar.batch.rule.ActiveRulesLoader;
-import org.sonar.batch.repository.QualityProfileLoader;
+import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
 
 public class NonAssociatedCacheSynchronizerTest {
   private NonAssociatedCacheSynchronizer synchronizer;
 
+  @Mock
+  private RulesLoader rulesLoader;
   @Mock
   private QualityProfileLoader qualityProfileLoader;
   @Mock
@@ -51,25 +52,25 @@ public class NonAssociatedCacheSynchronizerTest {
   public void setUp() {
     MockitoAnnotations.initMocks(this);
 
-    QProfile pf = new QProfile("profile", "profile", "lang", new Date(1000));
-    ActiveRule ar = mock(ActiveRule.class);
+    QualityProfile pf = QualityProfile.newBuilder().setKey("profile").setName("profile").setLanguage("lang").build();
+    LoadedActiveRule ar = new LoadedActiveRule();
 
-    when(qualityProfileLoader.load(null, null)).thenReturn(ImmutableList.of(pf));
-    when(activeRulesLoader.load(ImmutableList.of("profile"), null)).thenReturn(ImmutableList.of(ar));
+    when(qualityProfileLoader.loadDefault(null, null)).thenReturn(ImmutableList.of(pf));
+    when(activeRulesLoader.load("profile", null)).thenReturn(ImmutableList.of(ar));
 
-    synchronizer = new NonAssociatedCacheSynchronizer(qualityProfileLoader, activeRulesLoader, cacheStatus);
+    synchronizer = new NonAssociatedCacheSynchronizer(rulesLoader, qualityProfileLoader, activeRulesLoader, cacheStatus);
   }
 
   @Test
   public void dont_sync_if_exists() {
-    when(cacheStatus.getSyncStatus(null)).thenReturn(new Date());
+    when(cacheStatus.getSyncStatus()).thenReturn(new Date());
     synchronizer.execute(false);
-    verifyNoMoreInteractions(qualityProfileLoader, activeRulesLoader);
+    verifyZeroInteractions(rulesLoader, qualityProfileLoader, activeRulesLoader);
   }
 
   @Test
   public void always_sync_if_force() {
-    when(cacheStatus.getSyncStatus(null)).thenReturn(new Date());
+    when(cacheStatus.getSyncStatus()).thenReturn(new Date());
     synchronizer.execute(true);
     checkSync();
   }
@@ -81,10 +82,11 @@ public class NonAssociatedCacheSynchronizerTest {
   }
 
   private void checkSync() {
-    verify(cacheStatus).getSyncStatus(null);
-    verify(cacheStatus).save(null);
-    verify(qualityProfileLoader).load(null, null);
-    verify(activeRulesLoader).load(ImmutableList.of("profile"), null);
+    verify(cacheStatus).getSyncStatus();
+    verify(cacheStatus).save();
+    verify(rulesLoader).load(null);
+    verify(qualityProfileLoader).loadDefault(null, null);
+    verify(activeRulesLoader).load("profile", null);
 
     verifyNoMoreInteractions(qualityProfileLoader, activeRulesLoader);
   }

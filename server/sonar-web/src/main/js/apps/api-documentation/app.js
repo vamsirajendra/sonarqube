@@ -10,12 +10,15 @@ import FiltersView from './filters-view';
 import SearchView from './search-view';
 
 var App = new Marionette.Application(),
-    init = function (options) {
+    init = function () {
+      let options = window.sonarqube;
+
       // State
       this.state = new Backbone.Model({ internal: false });
-      this.state.match = function (test) {
+      this.state.match = function (test, internal) {
         var pattern = new RegExp(this.get('query'), 'i');
-        return test.search(pattern) !== -1;
+        var internalCheck = !this.get('internal') && internal;
+        return test.search(pattern) !== -1 && !internalCheck;
       };
 
       // Layout
@@ -61,9 +64,7 @@ var App = new Marionette.Application(),
     };
 
 App.on('start', function (options) {
-  window.requestMessages().done(function () {
-    init.call(App, options);
-  });
+  init.call(App, options);
 });
 
-export default App;
+window.sonarqube.appStarted.then(options => App.start(options));

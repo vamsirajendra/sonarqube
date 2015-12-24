@@ -24,6 +24,7 @@ import java.io.StringReader;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.sonar.api.batch.fs.internal.DefaultFileSystem;
 import org.sonar.api.batch.fs.internal.DefaultInputFile;
@@ -32,6 +33,7 @@ import org.sonar.api.batch.fs.internal.FileMetadata;
 import org.sonar.api.batch.rule.ActiveRules;
 import org.sonar.api.batch.rule.internal.ActiveRulesBuilder;
 import org.sonar.api.batch.sensor.coverage.CoverageType;
+import org.sonar.api.batch.sensor.coverage.NewCoverage;
 import org.sonar.api.batch.sensor.highlighting.TypeOfText;
 import org.sonar.api.batch.sensor.issue.NewIssue;
 import org.sonar.api.config.Settings;
@@ -44,6 +46,10 @@ public class SensorContextTesterTest {
 
   @Rule
   public TemporaryFolder temp = new TemporaryFolder();
+
+  @Rule
+  public ExpectedException exception = ExpectedException.none();
+
   private SensorContextTester tester;
   private File baseDir;
 
@@ -140,14 +146,27 @@ public class SensorContextTesterTest {
   }
 
   @Test
-  public void testDuplication() {
-    assertThat(tester.duplications()).isEmpty();
-    tester.newDuplication()
-      .originBlock(new DefaultInputFile("foo", "src/Foo.java").setLines(40), 1, 30)
-      .isDuplicatedBy(new DefaultInputFile("foo", "src/Foo2.java").setLines(40), 3, 33)
-      .isDuplicatedBy(new DefaultInputFile("foo", "src/Foo3.java").setLines(40), 4, 34)
-      .save();
-    assertThat(tester.duplications()).hasSize(1);
+  public void testCoverageAtLineZero() {
+    assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 1)).isNull();
+    assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 4)).isNull();
+
+    exception.expect(IllegalStateException.class);
+    NewCoverage coverage = tester.newCoverage()
+      .onFile(new DefaultInputFile("foo", "src/Foo.java").initMetadata(new FileMetadata().readMetadata(new StringReader("annot dsf fds foo bar"))))
+      .ofType(CoverageType.UNIT)
+      .lineHits(0, 3);
+  }
+
+  @Test
+  public void testCoverageAtLineOutOfRange() {
+    assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 1)).isNull();
+    assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 4)).isNull();
+    exception.expect(IllegalStateException.class);
+
+    NewCoverage coverage = tester.newCoverage()
+      .onFile(new DefaultInputFile("foo", "src/Foo.java").initMetadata(new FileMetadata().readMetadata(new StringReader("annot dsf fds foo bar"))))
+      .ofType(CoverageType.UNIT)
+      .lineHits(4, 3);
   }
 
   @Test
@@ -155,14 +174,14 @@ public class SensorContextTesterTest {
     assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 1)).isNull();
     assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 4)).isNull();
     tester.newCoverage()
-      .onFile(new DefaultInputFile("foo", "src/Foo.java").initMetadata(new FileMetadata().readMetadata(new StringReader("annot dsf fds foo bar"))))
+      .onFile(new DefaultInputFile("foo", "src/Foo.java").initMetadata(new FileMetadata().readMetadata(new StringReader("annot dsf fds foo bar\nasdas"))))
       .ofType(CoverageType.UNIT)
       .lineHits(1, 2)
-      .lineHits(4, 3)
+      .lineHits(2, 3)
       .save();
     assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 1)).isEqualTo(2);
     assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.IT, 1)).isNull();
-    assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 4)).isEqualTo(3);
+    assertThat(tester.lineHits("foo:src/Foo.java", CoverageType.UNIT, 2)).isEqualTo(3);
   }
 
   @Test
@@ -170,7 +189,7 @@ public class SensorContextTesterTest {
     assertThat(tester.conditions("foo:src/Foo.java", CoverageType.UNIT, 1)).isNull();
     assertThat(tester.coveredConditions("foo:src/Foo.java", CoverageType.UNIT, 1)).isNull();
     tester.newCoverage()
-      .onFile(new DefaultInputFile("foo", "src/Foo.java").initMetadata(new FileMetadata().readMetadata(new StringReader("annot dsf fds foo bar"))))
+      .onFile(new DefaultInputFile("foo", "src/Foo.java").initMetadata(new FileMetadata().readMetadata(new StringReader("annot dsf fds foo bar\nasd\nasdas\nasdfas"))))
       .ofType(CoverageType.UNIT)
       .conditions(1, 4, 2)
       .save();

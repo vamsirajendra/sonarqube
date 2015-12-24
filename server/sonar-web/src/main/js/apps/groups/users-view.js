@@ -1,12 +1,12 @@
-import Modal from 'components/common/modals';
-import 'components/common/select-list';
-import './templates';
+import Modal from '../../components/common/modals';
+import '../../components/common/select-list';
+import Template from './templates/groups-users.hbs';
 
 export default Modal.extend({
-  template: Templates['groups-users'],
+  template: Template,
 
   onRender: function () {
-    this._super();
+    Modal.prototype.onRender.apply(this, arguments);
     new window.SelectList({
       el: this.$('#groups-users'),
       width: '100%',
@@ -16,9 +16,9 @@ export default Modal.extend({
         return item.name + '<br><span class="note">' + item.login + '</span>';
       },
       queryParam: 'q',
-      searchUrl: baseUrl + '/api/usergroups/users?ps=100&id=' + this.model.id,
-      selectUrl: baseUrl + '/api/usergroups/add_user',
-      deselectUrl: baseUrl + '/api/usergroups/remove_user',
+      searchUrl: baseUrl + '/api/user_groups/users?ps=100&id=' + this.model.id,
+      selectUrl: baseUrl + '/api/user_groups/add_user',
+      deselectUrl: baseUrl + '/api/user_groups/remove_user',
       extra: {
         id: this.model.id
       },
@@ -33,7 +33,7 @@ export default Modal.extend({
 
   onDestroy: function () {
     this.model.collection.refresh();
-    this._super();
+    Modal.prototype.onDestroy.apply(this, arguments);
   }
 });
 

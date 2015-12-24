@@ -1,9 +1,9 @@
 import _ from 'underscore';
 import Marionette from 'backbone.marionette';
-import './templates';
+import Template from './templates/update-center-header.hbs';
 
 export default Marionette.ItemView.extend({
-  template: Templates['update-center-header'],
+  template: Template,
 
   collectionEvents: {
     all: 'render'
@@ -18,7 +18,7 @@ export default Marionette.ItemView.extend({
   },
 
   serializeData: function () {
-    return _.extend(this._super(), {
+    return _.extend(Marionette.ItemView.prototype.serializeData.apply(this, arguments), {
       installing: this.collection._installedCount,
       uninstalling: this.collection._uninstalledCount
     });

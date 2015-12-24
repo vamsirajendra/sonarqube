@@ -19,7 +19,13 @@
  */
 package org.sonar.batch.mediumtest.issuesmode;
 
+import org.apache.commons.lang.StringUtils;
+
+import org.sonar.api.utils.log.LoggerLevel;
+import org.assertj.core.api.Condition;
+import org.sonar.batch.issue.tracking.TrackedIssue;
 import com.google.common.collect.ImmutableMap;
+
 import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
@@ -27,6 +33,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.FileFilterUtils;
@@ -35,18 +42,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.sonar.api.CoreProperties;
-import org.sonar.api.issue.Issue;
 import org.sonar.api.utils.log.LogTester;
 import org.sonar.batch.bootstrapper.IssueListener;
 import org.sonar.batch.mediumtest.BatchMediumTester;
 import org.sonar.batch.mediumtest.TaskResult;
 import org.sonar.batch.protocol.Constants.Severity;
-import org.sonar.batch.protocol.input.ActiveRule;
 import org.sonar.batch.protocol.input.BatchInput.ServerIssue;
 import org.sonar.batch.scan.report.ConsoleReport;
 import org.sonar.xoo.XooPlugin;
 import org.sonar.xoo.rule.XooRulesDefinition;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class IssueModeAndReportsMediumTest {
@@ -74,10 +78,10 @@ public class IssueModeAndReportsMediumTest {
     .addRules(new XooRulesDefinition())
     .addRule("manual:MyManualIssue", "manual", "MyManualIssue", "My manual issue")
     .addRule("manual:MyManualIssueDup", "manual", "MyManualIssue", "My manual issue")
-    .activateRule(new ActiveRule("xoo", "OneIssuePerLine", null, "One issue per line", "MAJOR", null, "xoo"))
-    .activateRule(new ActiveRule("xoo", "OneIssueOnDirPerFile", null, "OneIssueOnDirPerFile", "MAJOR", null, "xoo"))
-    .activateRule(new ActiveRule("xoo", "OneIssuePerModule", null, "OneIssuePerModule", "MAJOR", null, "xoo"))
-    .activateRule(new ActiveRule("manual", "MyManualIssue", null, "My manual issue", "MAJOR", null, null))
+    .addActiveRule("xoo", "OneIssuePerLine", null, "One issue per line", "MAJOR", null, "xoo")
+    .addActiveRule("xoo", "OneIssueOnDirPerFile", null, "OneIssueOnDirPerFile", "MAJOR", null, "xoo")
+    .addActiveRule("xoo", "OneIssuePerModule", null, "OneIssuePerModule", "MAJOR", null, "xoo")
+    .addActiveRule("manual", "MyManualIssue", null, "My manual issue", "MAJOR", null, null)
     .setPreviousAnalysisDate(new Date())
     // Existing issue that is still detected
     .mockServerIssue(ServerIssue.newBuilder().setKey("xyz")
@@ -154,9 +158,10 @@ public class IssueModeAndReportsMediumTest {
     int newIssues = 0;
     int openIssues = 0;
     int resolvedIssue = 0;
-    for (Issue issue : result.trackedIssues()) {
+    for (TrackedIssue issue : result.trackedIssues()) {
       System.out
-        .println(issue.message() + " " + issue.key() + " " + issue.ruleKey() + " " + issue.isNew() + " " + issue.resolution() + " " + issue.componentKey() + " " + issue.line());
+        .println(issue.getMessage() + " " + issue.key() + " " + issue.getRuleKey() + " " + issue.isNew() + " " + issue.resolution() + " " + issue.componentKey() + " "
+          + issue.startLine());
       if (issue.isNew()) {
         newIssues++;
       } else if (issue.resolution() != null) {
@@ -169,6 +174,23 @@ public class IssueModeAndReportsMediumTest {
     assertThat(newIssues).isEqualTo(16);
     assertThat(openIssues).isEqualTo(3);
     assertThat(resolvedIssue).isEqualTo(1);
+    
+    // progress report
+    String logs = StringUtils.join(logTester.logs(LoggerLevel.INFO), "\n");
+    
+    assertThat(logs).contains("Performing issue tracking");
+    assertThat(logs).contains("6/6 components tracked");
+
+    // assert that original fields of a matched issue are kept
+    assertThat(result.trackedIssues()).haveExactly(1, new Condition<TrackedIssue>() {
+      @Override
+      public boolean matches(TrackedIssue value) {
+        return value.isNew() == false
+          && "resolved-on-project".equals(value.key())
+          && "OPEN".equals(value.status())
+          && new Date(date("14/03/2004")).equals(value.creationDate());
+      }
+    });
   }
 
   @Test

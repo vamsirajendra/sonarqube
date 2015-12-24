@@ -1,15 +1,16 @@
 import $ from 'jquery';
-import WorkspaceListView from 'components/navigator/workspace-list-view';
+import WorkspaceListView from '../../components/navigator/workspace-list-view';
 import IssueView from './workspace-list-item-view';
 import EmptyView from './workspace-list-empty-view';
-import './templates';
+import Template from './templates/issues-workspace-list.hbs';
+import ComponentTemplate from './templates/issues-workspace-list-component.hbs';
 
 var COMPONENT_HEIGHT = 29,
     BOTTOM_OFFSET = 60;
 
 export default WorkspaceListView.extend({
-  template: Templates['issues-workspace-list'],
-  componentTemplate: Templates['issues-workspace-list-component'],
+  template: Template,
+  componentTemplate: ComponentTemplate,
   childView: IssueView,
   childViewContainer: '.js-list',
   emptyView: EmptyView,
@@ -84,9 +85,9 @@ export default WorkspaceListView.extend({
     var $container = this.getChildViewContainer(compositeView),
         model = this.collection.at(index);
     if (model != null) {
-      var prev = this.collection.at(index - 1),
-          putComponent = prev == null;
-      if (prev != null) {
+      var prev = index > 0 && this.collection.at(index - 1),
+          putComponent = !prev;
+      if (prev) {
         var fullComponent = [model.get('project'), model.get('component')].join(' '),
             fullPrevComponent = [prev.get('project'), prev.get('component')].join(' ');
         if (fullComponent !== fullPrevComponent) {

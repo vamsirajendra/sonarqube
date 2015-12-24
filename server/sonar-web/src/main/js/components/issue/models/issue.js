@@ -214,6 +214,24 @@ export default Backbone.Model.extend({
     });
   },
 
+
+  /**
+   * Do a custom (plugin) action
+   * @param {String} actionKey Action Key
+   * @param {Object|null} options Options for jQuery ajax
+   * @returns {jqXHR}
+   */
+  customAction: function (actionKey, options) {
+    var opts = _.extend({
+      type: 'POST',
+      url: this.urlRoot() + '/do_action',
+      data: { issue: this.id, actionKey: actionKey }
+    }, options);
+    var xhr = Backbone.ajax(opts);
+    this.trigger('request', this, xhr, opts);
+    return xhr;
+  },
+
   getLinearLocations: function () {
     var textRange = this.get('textRange');
     if (!textRange) {

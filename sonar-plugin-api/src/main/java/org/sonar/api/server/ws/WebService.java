@@ -43,8 +43,13 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.sonar.api.ExtensionPoint;
 import org.sonar.api.server.ServerSide;
+import org.sonar.api.utils.log.Logger;
+import org.sonar.api.utils.log.Loggers;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.lang.String.format;
 
 /**
  * Defines a web service. Note that contrary to the deprecated {@link org.sonar.api.web.Webservice}
@@ -69,7 +74,9 @@ import static com.google.common.base.Preconditions.checkArgument;
  *         public void handle(Request request, Response response) {
  *           // read request parameters and generates response output
  *           response.newJsonWriter()
+ *             .beginObject()
  *             .prop("hello", request.mandatoryParam("key"))
+ *             .endObject()
  *             .close();
  *         }
  *      })
@@ -129,7 +136,7 @@ public interface WebService extends Definable<WebService.Context> {
     private void register(NewController newController) {
       if (controllers.containsKey(newController.path)) {
         throw new IllegalStateException(
-          String.format("The web service '%s' is defined multiple times", newController.path));
+          format("The web service '%s' is defined multiple times", newController.path));
       }
       controllers.put(newController.path, new Controller(newController));
     }
@@ -189,7 +196,7 @@ public interface WebService extends Definable<WebService.Context> {
     public NewAction createAction(String actionKey) {
       if (actions.containsKey(actionKey)) {
         throw new IllegalStateException(
-          String.format("The action '%s' is defined multiple times in the web service '%s'", actionKey, path));
+          format("The action '%s' is defined multiple times in the web service '%s'", actionKey, path));
       }
       NewAction action = new NewAction(actionKey);
       actions.put(actionKey, action);
@@ -205,10 +212,7 @@ public interface WebService extends Definable<WebService.Context> {
     private final Map<String, Action> actions;
 
     private Controller(NewController newController) {
-      if (newController.actions.isEmpty()) {
-        throw new IllegalStateException(
-          String.format("At least one action must be declared in the web service '%s'", newController.path));
-      }
+      checkState(!newController.actions.isEmpty(), format("At least one action must be declared in the web service '%s'", newController.path));
       this.path = newController.path;
       this.description = newController.description;
       this.since = newController.since;
@@ -263,6 +267,7 @@ public interface WebService extends Definable<WebService.Context> {
     private String deprecatedKey;
     private String description;
     private String since;
+    private String deprecatedSince;
     private boolean post = false;
     private boolean isInternal = false;
     private RequestHandler handler;
@@ -285,6 +290,11 @@ public interface WebService extends Definable<WebService.Context> {
 
     public NewAction setSince(@Nullable String s) {
       this.since = s;
+      return this;
+    }
+
+    public NewAction setDeprecatedSince(@Nullable String deprecatedSince) {
+      this.deprecatedSince = deprecatedSince;
       return this;
     }
 
@@ -319,10 +329,8 @@ public interface WebService extends Definable<WebService.Context> {
     }
 
     public NewParam createParam(String paramKey) {
-      if (newParams.containsKey(paramKey)) {
-        throw new IllegalStateException(
-          String.format("The parameter '%s' is defined multiple times in the action '%s'", paramKey, key));
-      }
+      checkState(!newParams.containsKey(paramKey),
+        format("The parameter '%s' is defined multiple times in the action '%s'", paramKey, key));
       NewParam newParam = new NewParam(paramKey);
       newParams.put(paramKey, newParam);
       return newParam;
@@ -356,6 +364,25 @@ public interface WebService extends Definable<WebService.Context> {
     }
 
     /**
+     * Add predefined parameters related to pagination of results with a maximum page size.
+     * Note the maximum is a documentation only feature. It does not check anything.
+     */
+    public NewAction addPagingParams(int defaultPageSize, int maxPageSize) {
+      createParam(Param.PAGE)
+        .setDescription("1-based page number")
+        .setExampleValue("42")
+        .setDeprecatedKey("pageIndex")
+        .setDefaultValue("1");
+
+      createParam(Param.PAGE_SIZE)
+        .setDescription("Page size. Must be greater than 0 and less than " + maxPageSize)
+        .setExampleValue("20")
+        .setDeprecatedKey("pageSize")
+        .setDefaultValue(String.valueOf(defaultPageSize));
+      return this;
+    }
+
+    /**
      * Creates the parameter {@link org.sonar.api.server.ws.WebService.Param#FIELDS}, which is
      * used to restrict the number of fields returned in JSON response.
      */
@@ -373,7 +400,7 @@ public interface WebService extends Definable<WebService.Context> {
      * The fields must be in the <strong>plural</strong> form (ex: "names", "keys")
      */
     public NewAction addSearchQuery(String exampleValue, String... pluralFields) {
-      String actionDescription = String.format("Limit search to %s that contain the supplied string.", Joiner.on(" or ").join(pluralFields));
+      String actionDescription = format("Limit search to %s that contain the supplied string.", Joiner.on(" or ").join(pluralFields));
       createParam(Param.TEXT_QUERY)
         .setDescription(actionDescription)
         .setExampleValue(exampleValue);
@@ -384,8 +411,23 @@ public interface WebService extends Definable<WebService.Context> {
      * Add predefined parameters related to sorting of results.
      */
     public <V> NewAction addSortParams(Collection<V> possibleValues, @Nullable V defaultValue, boolean defaultAscending) {
+      genericAddSortParam(possibleValues, defaultValue, defaultAscending, "Sort field");
+
+      return this;
+    }
+
+    /**
+     * Add predefined parameters related to sorting of results. Comma-separated list
+     */
+    public <V> NewAction addMultiSortsParams(Collection<V> possibleValues, @Nullable V defaultValue, boolean defaultAscending) {
+      genericAddSortParam(possibleValues, defaultValue, defaultAscending, "Comma-separated list of sort fields");
+
+      return this;
+    }
+
+    public <V> NewAction genericAddSortParam(Collection<V> possibleValues, @Nullable V defaultValue, boolean defaultAscending, String description) {
       createParam(Param.SORT)
-        .setDescription("Sort field")
+        .setDescription(description)
         .setDeprecatedKey("sort")
         .setDefaultValue(defaultValue)
         .setPossibleValues(possibleValues);
@@ -412,11 +454,14 @@ public interface WebService extends Definable<WebService.Context> {
 
   @Immutable
   class Action {
+    private static final Logger LOGGER = Loggers.get(Action.class);
+
     private final String key;
     private final String deprecatedKey;
     private final String path;
     private final String description;
     private final String since;
+    private final String deprecatedSince;
     private final boolean post;
     private final boolean isInternal;
     private final RequestHandler handler;
@@ -426,23 +471,31 @@ public interface WebService extends Definable<WebService.Context> {
     private Action(Controller controller, NewAction newAction) {
       this.key = newAction.key;
       this.deprecatedKey = newAction.deprecatedKey;
-      this.path = String.format("%s/%s", controller.path(), key);
+      this.path = format("%s/%s", controller.path(), key);
       this.description = newAction.description;
-      this.since = StringUtils.defaultIfBlank(newAction.since, controller.since);
+      this.since = newAction.since;
+      this.deprecatedSince = newAction.deprecatedSince;
       this.post = newAction.post;
       this.isInternal = newAction.isInternal;
       this.responseExample = newAction.responseExample;
-
-      if (newAction.handler == null) {
-        throw new IllegalArgumentException("RequestHandler is not set on action " + path);
-      }
       this.handler = newAction.handler;
+
+      checkState(this.handler != null, "RequestHandler is not set on action " + path);
+      logWarningIf(isNullOrEmpty(this.description), "Description is not set on action " + path);
+      logWarningIf(isNullOrEmpty(this.since), "Since is not set on action " + path);
+      logWarningIf(!this.post && this.responseExample == null, "The response example is not set on action " + path);
 
       ImmutableMap.Builder<String, Param> paramsBuilder = ImmutableMap.builder();
       for (NewParam newParam : newAction.newParams.values()) {
         paramsBuilder.put(newParam.key, new Param(this, newParam));
       }
       this.params = paramsBuilder.build();
+    }
+
+    private static void logWarningIf(boolean condition, String message) {
+      if (condition) {
+        LOGGER.warn(message);
+      }
     }
 
     public String key() {
@@ -468,6 +521,11 @@ public interface WebService extends Definable<WebService.Context> {
     @CheckForNull
     public String since() {
       return since;
+    }
+
+    @CheckForNull
+    public String deprecatedSince() {
+      return deprecatedSince;
     }
 
     public boolean isPost() {
@@ -533,6 +591,8 @@ public interface WebService extends Definable<WebService.Context> {
 
   class NewParam {
     private String key;
+    private String since;
+    private String deprecatedSince;
     private String deprecatedKey;
     private String description;
     private String exampleValue;
@@ -542,6 +602,16 @@ public interface WebService extends Definable<WebService.Context> {
 
     private NewParam(String key) {
       this.key = key;
+    }
+
+    public NewParam setSince(@Nullable String since) {
+      this.since = since;
+      return this;
+    }
+
+    public NewParam setDeprecatedSince(@Nullable String deprecatedSince) {
+      this.deprecatedSince = deprecatedSince;
+      return this;
     }
 
     /**
@@ -666,6 +736,8 @@ public interface WebService extends Definable<WebService.Context> {
     public static final String SELECTED = "selected";
 
     private final String key;
+    private final String since;
+    private final String deprecatedSince;
     private final String deprecatedKey;
     private final String description;
     private final String exampleValue;
@@ -675,6 +747,8 @@ public interface WebService extends Definable<WebService.Context> {
 
     protected Param(Action action, NewParam newParam) {
       this.key = newParam.key;
+      this.since = newParam.since;
+      this.deprecatedSince = newParam.deprecatedSince;
       this.deprecatedKey = newParam.deprecatedKey;
       this.description = newParam.description;
       this.exampleValue = newParam.exampleValue;
@@ -682,12 +756,28 @@ public interface WebService extends Definable<WebService.Context> {
       this.required = newParam.required;
       this.possibleValues = newParam.possibleValues;
       if (required && defaultValue != null) {
-        throw new IllegalArgumentException(String.format("Default value must not be set on parameter '%s?%s' as it's marked as required", action, key));
+        throw new IllegalArgumentException(format("Default value must not be set on parameter '%s?%s' as it's marked as required", action, key));
       }
     }
 
     public String key() {
       return key;
+    }
+
+    /**
+     * @since 5.3
+     */
+    @CheckForNull
+    public String since() {
+      return since;
+    }
+
+    /**
+     * @since 5.3
+     */
+    @CheckForNull
+    public String deprecatedSince() {
+      return deprecatedSince;
     }
 
     /**

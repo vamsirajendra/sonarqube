@@ -1,9 +1,8 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import Main from './main';
 
-export default {
-  start (options) {
-    var el = document.querySelector(options.el);
-    React.render(<Main options={options}/>, el);
-  }
-};
+window.sonarqube.appStarted.then(options => {
+  let el = document.querySelector(options.el);
+  ReactDOM.render(<Main options={options}/>, el);
+});

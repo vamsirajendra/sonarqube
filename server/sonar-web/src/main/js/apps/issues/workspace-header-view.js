@@ -1,10 +1,10 @@
 import $ from 'jquery';
 import _ from 'underscore';
-import WorkspaceHeaderView from 'components/navigator/workspace-header-view';
-import './templates';
+import WorkspaceHeaderView from '../../components/navigator/workspace-header-view';
+import Template from './templates/issues-workspace-header.hbs';
 
 export default WorkspaceHeaderView.extend({
-  template: Templates['issues-workspace-header'],
+  template: Template,
 
   events: function () {
     return _.extend(WorkspaceHeaderView.prototype.events.apply(this, arguments), {
@@ -22,7 +22,7 @@ export default WorkspaceHeaderView.extend({
   },
 
   onDestroy: function () {
-    this._super();
+    WorkspaceHeaderView.prototype.onDestroy.apply(this, arguments);
     window.onBulkIssues = this._onBulkIssues;
   },
 
@@ -49,7 +49,7 @@ export default WorkspaceHeaderView.extend({
 
   render: function () {
     if (!this._suppressUpdate) {
-      this._super();
+      WorkspaceHeaderView.prototype.render.apply(this, arguments);
     }
   },
 
@@ -103,7 +103,7 @@ export default WorkspaceHeaderView.extend({
         selectedCount = this.options.app.list.where({ selected: true }).length,
         allSelected = issuesCount > 0 && issuesCount === selectedCount,
         someSelected = !allSelected && selectedCount > 0;
-    return _.extend(this._super(), {
+    return _.extend(WorkspaceHeaderView.prototype.serializeData.apply(this, arguments), {
       selectedCount: selectedCount,
       allSelected: allSelected,
       someSelected: someSelected

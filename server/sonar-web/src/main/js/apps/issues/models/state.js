@@ -1,19 +1,19 @@
 import _ from 'underscore';
-import State from 'components/navigator/models/state';
+import State from '../../../components/navigator/models/state';
 
 export default State.extend({
   defaults: {
     page: 1,
     maxResultsReached: false,
     query: {},
-    facets: ['facetMode', 'severities'],
+    facets: ['facetMode', 'severities', 'resolutions'],
     isContext: false,
     allFacets: [
       'facetMode',
       'issues',
       'severities',
-      'statuses',
       'resolutions',
+      'statuses',
       'createdAt',
       'rules',
       'tags',
@@ -45,6 +45,7 @@ export default State.extend({
       'createdAt'
     ],
     transform: {
+      'resolved': 'resolutions',
       'assigned': 'assignees',
       'planned': 'actionPlans',
       'createdBefore': 'createdAt',

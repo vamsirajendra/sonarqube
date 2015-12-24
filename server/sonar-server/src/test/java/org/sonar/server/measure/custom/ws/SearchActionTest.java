@@ -45,7 +45,7 @@ import org.sonar.db.measure.custom.CustomMeasureDto;
 import org.sonar.db.metric.MetricDto;
 import org.sonar.server.component.ComponentFinder;
 import org.sonar.db.component.ComponentTesting;
-import org.sonar.server.component.SnapshotTesting;
+import org.sonar.db.component.SnapshotTesting;
 import org.sonar.server.db.DbClient;
 import org.sonar.server.es.EsTester;
 import org.sonar.server.exceptions.ForbiddenException;
@@ -208,7 +208,7 @@ public class SearchActionTest {
     dbClient.customMeasureDao().insert(dbSession, newCustomMeasure(1, metric)
       .setCreatedAt(yesterday)
       .setUpdatedAt(yesterday));
-    dbClient.snapshotDao().insert(dbSession, SnapshotTesting.createForProject(defaultProject));
+    dbClient.snapshotDao().insert(dbSession, SnapshotTesting.newSnapshotForProject(defaultProject));
     dbSession.commit();
 
     String response = newRequest()
@@ -243,7 +243,7 @@ public class SearchActionTest {
   @Test
   public void fail_when_project_id_and_project_key_provided() throws Exception {
     expectedException.expect(IllegalArgumentException.class);
-    expectedException.expectMessage("The component key or the component id must be provided, not both.");
+    expectedException.expectMessage("Either 'projectId' or 'projectKey' must be provided, not both");
 
     newRequest()
       .setParam(SearchAction.PARAM_PROJECT_ID, DEFAULT_PROJECT_UUID)
@@ -254,7 +254,7 @@ public class SearchActionTest {
   @Test
   public void fail_when_project_id_nor_project_key_provided() throws Exception {
     expectedException.expect(IllegalArgumentException.class);
-    expectedException.expectMessage("The component key or the component id must be provided, not both.");
+    expectedException.expectMessage("Either 'projectId' or 'projectKey' must be provided, not both");
     newRequest().execute();
   }
 

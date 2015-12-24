@@ -1,9 +1,9 @@
 import _ from 'underscore';
 import BaseFacet from './base-facet';
-import '../templates';
+import Template from '../templates/facets/coding-rules-custom-values-facet.hbs';
 
 export default BaseFacet.extend({
-  template: Templates['coding-rules-custom-values-facet'],
+  template: Template,
 
   events: function () {
     return _.extend(BaseFacet.prototype.events.apply(this, arguments), {
@@ -22,17 +22,17 @@ export default BaseFacet.extend({
 
   prepareSearch: function () {
     this.$('.js-custom-value').select2({
-      placeholder: t('search_verb'),
+      placeholder: window.t('search_verb'),
       minimumInputLength: 1,
       allowClear: false,
       formatNoMatches: function () {
-        return t('select2.noMatches');
+        return window.t('select2.noMatches');
       },
       formatSearching: function () {
-        return t('select2.searching');
+        return window.t('select2.searching');
       },
       formatInputTooShort: function () {
-        return tp('select2.tooShort', 1);
+        return window.tp('select2.tooShort', 1);
       },
       width: '100%',
       ajax: this.prepareAjaxSearch()
@@ -65,5 +65,3 @@ export default BaseFacet.extend({
     this.options.app.state.updateFilter(obj);
   }
 });
-
-

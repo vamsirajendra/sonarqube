@@ -20,7 +20,6 @@
 package org.sonar.batch.analysis;
 
 import org.junit.Rule;
-
 import org.junit.rules.ExpectedException;
 import org.sonar.batch.analysis.DefaultAnalysisMode;
 import org.sonar.batch.analysis.AnalysisProperties;
@@ -85,9 +84,33 @@ public class DefaultAnalysisModeTest {
   }
 
   @Test
+  public void scan_all() {
+    Map<String, String> props = new HashMap<>();
+    props.put(CoreProperties.ANALYSIS_MODE, CoreProperties.ANALYSIS_MODE_ISSUES);
+    GlobalProperties globalProps = new GlobalProperties(props);
+
+    AnalysisProperties analysisProps = new AnalysisProperties(new HashMap<String, String>());
+    DefaultAnalysisMode mode = new DefaultAnalysisMode(globalProps, analysisProps);
+    assertThat(mode.scanAllFiles()).isFalse();
+
+    props.put("sonar.scanAllFiles", "true");
+    analysisProps = new AnalysisProperties(props);
+
+    mode = new DefaultAnalysisMode(globalProps, analysisProps);
+    assertThat(mode.scanAllFiles()).isTrue();
+
+    props.put(CoreProperties.ANALYSIS_MODE, CoreProperties.ANALYSIS_MODE_PUBLISH);
+    analysisProps = new AnalysisProperties(props);
+
+    mode = new DefaultAnalysisMode(globalProps, analysisProps);
+    assertThat(mode.scanAllFiles()).isTrue();
+  }
+
+  @Test
   public void default_publish_mode() {
     DefaultAnalysisMode mode = createMode(null);
     assertThat(mode.isPublish()).isTrue();
+    assertThat(mode.scanAllFiles()).isTrue();
   }
 
   @Test
@@ -95,6 +118,7 @@ public class DefaultAnalysisModeTest {
     DefaultAnalysisMode mode = createMode(CoreProperties.ANALYSIS_MODE_ISSUES);
 
     assertThat(mode.isIssues()).isTrue();
+    assertThat(mode.scanAllFiles()).isFalse();
   }
 
   private static DefaultAnalysisMode createMode(@Nullable String mode) {

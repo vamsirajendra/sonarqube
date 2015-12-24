@@ -28,6 +28,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
+import org.sonar.api.resources.Qualifiers;
 import org.sonar.api.server.ws.WebService;
 import org.sonar.api.utils.System2;
 import org.sonar.api.web.UserRole;
@@ -35,6 +36,7 @@ import org.sonar.core.permission.GlobalPermissions;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.db.DbTester;
+import org.sonar.db.component.ResourceTypesRule;
 import org.sonar.db.permission.PermissionTemplateDto;
 import org.sonar.db.permission.PermissionTemplateUserDto;
 import org.sonar.db.user.UserDto;
@@ -44,18 +46,20 @@ import org.sonar.server.exceptions.ForbiddenException;
 import org.sonar.server.exceptions.NotFoundException;
 import org.sonar.server.exceptions.UnauthorizedException;
 import org.sonar.server.tester.UserSessionRule;
+import org.sonar.server.usergroups.ws.UserGroupFinder;
 import org.sonar.server.ws.TestRequest;
 import org.sonar.server.ws.WsActionTester;
 import org.sonar.test.DbTests;
-import org.sonarqube.ws.WsPermissions.WsUsersResponse;
+import org.sonarqube.ws.WsPermissions;
+import org.sonarqube.ws.WsPermissions.UsersWsResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.sonar.api.web.UserRole.ADMIN;
 import static org.sonar.db.permission.PermissionTemplateTesting.newPermissionTemplateDto;
 import static org.sonar.db.permission.PermissionTemplateTesting.newPermissionTemplateUserDto;
-import static org.sonar.server.plugins.MimeTypes.PROTOBUF;
+import static org.sonarqube.ws.MediaTypes.PROTOBUF;
 import static org.sonar.test.JsonAssert.assertJson;
-import static org.sonarqube.ws.WsPermissions.WsUsersResponse.parseFrom;
+import static org.sonarqube.ws.WsPermissions.UsersWsResponse.parseFrom;
 
 @Category(DbTests.class)
 public class TemplateUsersActionTest {
@@ -66,6 +70,7 @@ public class TemplateUsersActionTest {
   public UserSessionRule userSession = UserSessionRule.standalone();
   @Rule
   public DbTester db = DbTester.create(System2.INSTANCE);
+  ResourceTypesRule resourceTypes = new ResourceTypesRule().setRootQualifiers(Qualifiers.PROJECT, Qualifiers.VIEW, "DEV");
   DbClient dbClient = db.getDbClient();
   DbSession dbSession = db.getSession();
   WsActionTester ws;
@@ -77,7 +82,7 @@ public class TemplateUsersActionTest {
 
   @Before
   public void setUp() {
-    PermissionDependenciesFinder dependenciesFinder = new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient));
+    PermissionDependenciesFinder dependenciesFinder = new PermissionDependenciesFinder(dbClient, new ComponentFinder(dbClient), new UserGroupFinder(dbClient), resourceTypes);
     underTest = new TemplateUsersAction(dbClient, userSession, dependenciesFinder);
     ws = new WsActionTester(underTest);
 
@@ -118,11 +123,11 @@ public class TemplateUsersActionTest {
   @Test
   public void search_for_users_by_template_name() throws IOException {
     InputStream responseStream = newRequest(UserRole.USER, null)
-      .setParam(WsPermissionParameters.PARAM_TEMPLATE_NAME, template1.getName())
+      .setParam(org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME, template1.getName())
       .setMediaType(PROTOBUF)
       .execute().getInputStream();
 
-    WsUsersResponse response = parseFrom(responseStream);
+    UsersWsResponse response = parseFrom(responseStream);
 
     assertThat(response.getUsersList()).extracting("login").containsExactly("login-1", "login-2");
   }
@@ -130,12 +135,12 @@ public class TemplateUsersActionTest {
   @Test
   public void search_using_text_query() throws IOException {
     InputStream responseStream = newRequest(UserRole.USER, null)
-      .setParam(WsPermissionParameters.PARAM_TEMPLATE_NAME, template1.getName())
+      .setParam(org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME, template1.getName())
       .setParam(WebService.Param.TEXT_QUERY, "ame-1")
       .setMediaType(PROTOBUF)
       .execute().getInputStream();
 
-    WsUsersResponse response = parseFrom(responseStream);
+    UsersWsResponse response = parseFrom(responseStream);
 
     assertThat(response.getUsersList()).extracting("login").containsOnly("login-1");
   }
@@ -143,12 +148,12 @@ public class TemplateUsersActionTest {
   @Test
   public void search_using_selected() throws IOException {
     InputStream responseStream = newRequest(UserRole.USER, null)
-      .setParam(WsPermissionParameters.PARAM_TEMPLATE_NAME, template1.getName())
+      .setParam(org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME, template1.getName())
       .setParam(WebService.Param.SELECTED, "all")
       .setMediaType(PROTOBUF)
       .execute().getInputStream();
 
-    WsUsersResponse response = parseFrom(responseStream);
+    WsPermissions.UsersWsResponse response = parseFrom(responseStream);
 
     assertThat(response.getUsersList()).extracting("login").containsExactly("login-1", "login-2", "login-3");
     assertThat(response.getUsers(2).getSelected()).isFalse();
@@ -157,14 +162,14 @@ public class TemplateUsersActionTest {
   @Test
   public void search_with_pagination() throws IOException {
     InputStream responseStream = newRequest(UserRole.USER, null)
-      .setParam(WsPermissionParameters.PARAM_TEMPLATE_NAME, template1.getName())
+      .setParam(org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME, template1.getName())
       .setParam(WebService.Param.SELECTED, "all")
       .setParam(WebService.Param.PAGE, "2")
       .setParam(WebService.Param.PAGE_SIZE, "1")
       .setMediaType(PROTOBUF)
       .execute().getInputStream();
 
-    WsUsersResponse response = parseFrom(responseStream);
+    WsPermissions.UsersWsResponse response = parseFrom(responseStream);
 
     assertThat(response.getUsersList()).extracting("login").containsOnly("login-2");
   }
@@ -190,7 +195,7 @@ public class TemplateUsersActionTest {
     expectedException.expect(BadRequestException.class);
 
     newRequest(UserRole.USER, template1.getUuid())
-      .setParam(WsPermissionParameters.PARAM_TEMPLATE_NAME, template1.getName())
+      .setParam(org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_NAME, template1.getName())
       .execute();
   }
 
@@ -232,9 +237,9 @@ public class TemplateUsersActionTest {
 
   private TestRequest newRequest(String permission, @Nullable String templateUuid) {
     TestRequest request = ws.newRequest();
-    request.setParam(WsPermissionParameters.PARAM_PERMISSION, permission);
+    request.setParam(org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_PERMISSION, permission);
     if (templateUuid != null) {
-      request.setParam(WsPermissionParameters.PARAM_TEMPLATE_UUID, templateUuid);
+      request.setParam(org.sonarqube.ws.client.permission.PermissionsWsParameters.PARAM_TEMPLATE_ID, templateUuid);
     }
 
     return request;

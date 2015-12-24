@@ -20,12 +20,15 @@
 
 package org.sonar.db.component;
 
+import javax.annotation.CheckForNull;
+
 public class FilePathWithHashDto {
 
   private String uuid;
   private String moduleUuid;
   private String path;
   private String srcHash;
+  private String revision;
 
   public String getSrcHash() {
     return srcHash;
@@ -43,12 +46,21 @@ public class FilePathWithHashDto {
     this.moduleUuid = moduleUuid;
   }
 
+  @CheckForNull
   public String getPath() {
     return path;
   }
 
   public void setPath(String path) {
     this.path = path;
+  }
+
+  public String getRevision() {
+    return revision;
+  }
+
+  public void setRevision(String revision) {
+    this.revision = revision;
   }
 
   public String getUuid() {
@@ -58,4 +70,5 @@ public class FilePathWithHashDto {
   public void setUuid(String uuid) {
     this.uuid = uuid;
   }
+
 }

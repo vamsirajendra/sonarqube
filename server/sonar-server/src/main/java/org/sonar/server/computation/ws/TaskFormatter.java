@@ -28,6 +28,7 @@ import java.util.Map;
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
 import org.sonar.api.utils.DateUtils;
+import org.sonar.api.utils.System2;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.db.ce.CeActivityDto;
@@ -45,10 +46,12 @@ public class TaskFormatter {
 
   private final DbClient dbClient;
   private final CeLogging ceLogging;
+  private final System2 system2;
 
-  public TaskFormatter(DbClient dbClient, CeLogging ceLogging) {
+  public TaskFormatter(DbClient dbClient, CeLogging ceLogging, System2 system2) {
     this.dbClient = dbClient;
     this.ceLogging = ceLogging;
+    this.system2 = system2;
   }
 
   public List<WsCe.Task> formatQueue(DbSession dbSession, List<CeQueueDto> dtos) {
@@ -81,6 +84,11 @@ public class TaskFormatter {
     if (dto.getStartedAt() != null) {
       builder.setStartedAt(DateUtils.formatDateTime(new Date(dto.getStartedAt())));
     }
+    //
+    Long executionTimeMs = computeExecutionTimeMs(dto);
+    if (executionTimeMs != null) {
+      builder.setExecutionTimeMs(executionTimeMs);
+    }
     return builder.build();
   }
 
@@ -107,6 +115,9 @@ public class TaskFormatter {
       builder.setComponentId(dto.getComponentUuid());
       buildComponent(builder, componentCache.get(dto.getComponentUuid()));
     }
+    if (dto.getSnapshotId() != null) {
+      builder.setAnalysisId(String.valueOf(dto.getSnapshotId()));
+    }
     if (dto.getSubmitterLogin() != null) {
       builder.setSubmitterLogin(dto.getSubmitterLogin());
     }
@@ -114,8 +125,8 @@ public class TaskFormatter {
     if (dto.getStartedAt() != null) {
       builder.setStartedAt(DateUtils.formatDateTime(new Date(dto.getStartedAt())));
     }
-    if (dto.getFinishedAt() != null) {
-      builder.setFinishedAt(DateUtils.formatDateTime(new Date(dto.getFinishedAt())));
+    if (dto.getExecutedAt() != null) {
+      builder.setExecutedAt(DateUtils.formatDateTime(new Date(dto.getExecutedAt())));
     }
     if (dto.getExecutionTimeMs() != null) {
       builder.setExecutionTimeMs(dto.getExecutionTimeMs());
@@ -127,6 +138,7 @@ public class TaskFormatter {
     if (componentDto != null) {
       builder.setComponentKey(componentDto.getKey());
       builder.setComponentName(componentDto.name());
+      builder.setComponentQualifier(componentDto.qualifier());
     }
   }
 
@@ -150,5 +162,17 @@ public class TaskFormatter {
       }
       return dto;
     }
+  }
+
+  /**
+   * now - startedAt
+   */
+  @CheckForNull
+  Long computeExecutionTimeMs(CeQueueDto dto) {
+    Long startedAt = dto.getStartedAt();
+    if (startedAt == null) {
+      return null;
+    }
+    return system2.now() - startedAt;
   }
 }

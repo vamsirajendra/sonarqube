@@ -25,22 +25,22 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.sonar.api.batch.rule.Rule;
-import org.sonar.api.issue.Issue;
 import org.sonar.api.rules.RulePriority;
+import org.sonar.batch.issue.tracking.TrackedIssue;
 
 public class ReportSummary {
 
   private final IssueVariation total = new IssueVariation();
 
-  private final Map<ReportRuleKey, RuleReport> ruleReportByRuleKey = Maps.newHashMap();
-  private final Map<String, IssueVariation> totalByRuleKey = Maps.newHashMap();
-  private final Map<String, IssueVariation> totalBySeverity = Maps.newHashMap();
+  private final Map<ReportRuleKey, RuleReport> ruleReportByRuleKey = Maps.newLinkedHashMap();
+  private final Map<String, IssueVariation> totalByRuleKey = Maps.newLinkedHashMap();
+  private final Map<String, IssueVariation> totalBySeverity = Maps.newLinkedHashMap();
 
   public IssueVariation getTotal() {
     return total;
   }
 
-  public void addIssue(Issue issue, Rule rule, RulePriority severity) {
+  public void addIssue(TrackedIssue issue, Rule rule, RulePriority severity) {
     ReportRuleKey reportRuleKey = new ReportRuleKey(rule, severity);
     initMaps(reportRuleKey);
     ruleReportByRuleKey.get(reportRuleKey).getTotal().incrementCountInCurrentAnalysis();
@@ -63,7 +63,7 @@ public class ReportSummary {
     return totalByRuleKey;
   }
 
-  public void addResolvedIssue(Issue issue, Rule rule, RulePriority severity) {
+  public void addResolvedIssue(TrackedIssue issue, Rule rule, RulePriority severity) {
     ReportRuleKey reportRuleKey = new ReportRuleKey(rule, severity);
     initMaps(reportRuleKey);
     total.incrementResolvedIssuesCount();

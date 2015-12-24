@@ -21,8 +21,12 @@ package org.sonar.batch.bootstrapper;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+
 import java.util.Map;
+
+import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
+
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -45,6 +49,7 @@ public final class LoggingConfiguration {
 
   private Map<String, String> substitutionVariables = Maps.newHashMap();
   private LogOutput logOutput = null;
+  private boolean verbose;
 
   public LoggingConfiguration() {
     this(null);
@@ -60,8 +65,14 @@ public final class LoggingConfiguration {
   }
 
   public LoggingConfiguration setProperties(Map<String, String> properties) {
-    setShowSql(properties);
-    setVerbose(properties);
+    setShowSql(properties, null);
+    setVerbose(properties, null);
+    return this;
+  }
+
+  public LoggingConfiguration setProperties(Map<String, String> properties, @Nullable Map<String, String> fallback) {
+    setShowSql(properties, fallback);
+    setVerbose(properties, fallback);
     return this;
   }
 
@@ -73,15 +84,32 @@ public final class LoggingConfiguration {
   public LoggingConfiguration setVerbose(boolean verbose) {
     return setRootLevel(verbose ? LEVEL_ROOT_VERBOSE : LEVEL_ROOT_DEFAULT);
   }
+  
+  public boolean isVerbose() {
+    return verbose;
+  }
 
-  public LoggingConfiguration setVerbose(Map<String, String> properties) {
-    String logLevel = properties.get("sonar.log.level");
-    String deprecatedProfilingLevel = properties.get("sonar.log.profilingLevel");
-    boolean verbose = "true".equals(properties.get("sonar.verbose")) ||
+  public LoggingConfiguration setVerbose(Map<String, String> props, @Nullable Map<String, String> fallback) {
+    String logLevel = getFallback("sonar.log.level", props, fallback);
+    String deprecatedProfilingLevel = getFallback("sonar.log.profilingLevel", props, fallback);
+    verbose = "true".equals(getFallback("sonar.verbose", props, fallback)) ||
       "DEBUG".equals(logLevel) || "TRACE".equals(logLevel) ||
       "BASIC".equals(deprecatedProfilingLevel) || "FULL".equals(deprecatedProfilingLevel);
 
     return setVerbose(verbose);
+  }
+
+  @CheckForNull
+  private static String getFallback(String key, Map<String, String> properties, @Nullable Map<String, String> fallback) {
+    if (properties.containsKey(key)) {
+      return properties.get(key);
+    }
+
+    if (fallback != null) {
+      return fallback.get(key);
+    }
+
+    return null;
   }
 
   public LoggingConfiguration setRootLevel(String level) {
@@ -92,9 +120,9 @@ public final class LoggingConfiguration {
     return addSubstitutionVariable(PROPERTY_SQL_LOGGER_LEVEL, showSql ? "TRACE" : "WARN");
   }
 
-  public LoggingConfiguration setShowSql(Map<String, String> properties) {
-    String logLevel = properties.get("sonar.log.level");
-    String deprecatedProfilingLevel = properties.get("sonar.log.profilingLevel");
+  public LoggingConfiguration setShowSql(Map<String, String> properties, @Nullable Map<String, String> fallback) {
+    String logLevel = getFallback("sonar.log.level", properties, fallback);
+    String deprecatedProfilingLevel = getFallback("sonar.log.profilingLevel", properties, fallback);
     boolean sql = "TRACE".equals(logLevel) || "FULL".equals(deprecatedProfilingLevel);
 
     return setShowSql(sql);

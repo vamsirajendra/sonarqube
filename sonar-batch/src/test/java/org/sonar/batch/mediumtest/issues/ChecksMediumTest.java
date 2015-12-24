@@ -22,16 +22,20 @@ package org.sonar.batch.mediumtest.issues;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.sonar.api.rule.RuleKey;
 import org.sonar.batch.mediumtest.BatchMediumTester;
 import org.sonar.batch.mediumtest.TaskResult;
-import org.sonar.batch.protocol.input.ActiveRule;
 import org.sonar.batch.protocol.output.BatchReport.Issue;
+import org.sonar.batch.rule.LoadedActiveRule;
 import org.sonar.xoo.XooPlugin;
 import org.sonar.xoo.rule.XooRulesDefinition;
 
@@ -48,8 +52,8 @@ public class ChecksMediumTest {
     .addDefaultQProfile("xoo", "Sonar Way")
     .addRule("TemplateRule_1234", "xoo", "TemplateRule_1234", "A template rule")
     .addRule("TemplateRule_1235", "xoo", "TemplateRule_1235", "Another template rule")
-    .activateRule(new ActiveRule("xoo", "TemplateRule_1234", "TemplateRule", "A template rule", "MAJOR", null, "xoo").addParam("line", "1"))
-    .activateRule(new ActiveRule("xoo", "TemplateRule_1235", "TemplateRule", "Another template rule", "MAJOR", null, "xoo").addParam("line", "2"))
+    .activateRule(createActiveRuleWithParam("xoo", "TemplateRule_1234", "TemplateRule", "A template rule", "MAJOR", null, "xoo", "line", "1"))
+    .activateRule(createActiveRuleWithParam("xoo", "TemplateRule_1235", "TemplateRule", "Another template rule", "MAJOR", null, "xoo", "line", "2"))
     .build();
 
   @Before
@@ -101,6 +105,23 @@ public class ChecksMediumTest {
     }
     assertThat(foundIssueAtLine1).isTrue();
     assertThat(foundIssueAtLine2).isTrue();
+  }
+
+  private LoadedActiveRule createActiveRuleWithParam(String repositoryKey, String ruleKey, @Nullable String templateRuleKey, String name, @Nullable String severity,
+    @Nullable String internalKey, @Nullable String languag, String paramKey, String paramValue) {
+    LoadedActiveRule r = new LoadedActiveRule();
+
+    r.setInternalKey(internalKey);
+    r.setRuleKey(RuleKey.of(repositoryKey, ruleKey));
+    r.setName(name);
+    r.setTemplateRuleKey(templateRuleKey);
+    r.setLanguage(languag);
+    r.setSeverity(severity);
+
+    Map<String, String> params = new HashMap<>();
+    params.put(paramKey, paramValue);
+    r.setParams(params);
+    return r;
   }
 
 }

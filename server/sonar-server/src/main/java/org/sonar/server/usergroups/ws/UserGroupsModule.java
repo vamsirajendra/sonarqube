@@ -26,8 +26,10 @@ public class UserGroupsModule extends Module {
   @Override
   protected void configureModule() {
     add(
-      GroupUpdater.class,
       UserGroupsWs.class,
+      UserGroupUpdater.class,
+      UserGroupFinder.class,
+      // actions
       SearchAction.class,
       CreateAction.class,
       DeleteAction.class,

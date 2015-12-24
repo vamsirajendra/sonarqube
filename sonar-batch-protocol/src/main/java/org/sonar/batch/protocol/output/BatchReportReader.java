@@ -91,6 +91,14 @@ public class BatchReportReader {
     return emptyCloseableIterator();
   }
 
+  public CloseableIterator<BatchReport.CpdTextBlock> readCpdTextBlocks(int componentRef) {
+    File file = fileStructure.fileFor(FileStructure.Domain.CPD_TEXT_BLOCKS, componentRef);
+    if (fileExists(file)) {
+      return Protobuf.readStream(file, BatchReport.CpdTextBlock.parser());
+    }
+    return emptyCloseableIterator();
+  }
+
   public CloseableIterator<BatchReport.Symbol> readComponentSymbols(int componentRef) {
     File file = fileStructure.fileFor(FileStructure.Domain.SYMBOLS, componentRef);
     if (fileExists(file)) {
@@ -110,6 +118,11 @@ public class BatchReportReader {
       return Protobuf.readStream(file, BatchReport.SyntaxHighlighting.PARSER);
     }
     return emptyCloseableIterator();
+  }
+
+  public boolean hasCoverage(int componentRef) {
+    File file = fileStructure.fileFor(FileStructure.Domain.COVERAGES, componentRef);
+    return file.exists();
   }
 
   public CloseableIterator<BatchReport.Coverage> readComponentCoverage(int fileRef) {

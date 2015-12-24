@@ -266,12 +266,6 @@ public interface CoreProperties {
   String CPD_PLUGIN = "cpd";
 
   /**
-   * @deprecated in 3.1
-   */
-  @Deprecated
-  String CPD_MINIMUM_TOKENS_PROPERTY = "sonar.cpd.minimumTokens";
-
-  /**
    * @deprecated in 5.0
    * @see <a href="https://jira.sonarsource.com/browse/SONAR-5339">SONAR-5339</a>
    */
@@ -287,7 +281,7 @@ public interface CoreProperties {
    * @see #CPD_CROSS_PROJECT
    * @since 2.11
    */
-  boolean CPD_CROSS_RPOJECT_DEFAULT_VALUE = false;
+  boolean CPD_CROSS_PROJECT_DEFAULT_VALUE = false;
 
   /**
    * @since 3.5
@@ -315,19 +309,6 @@ public interface CoreProperties {
   /* Google Analytics */
   String GOOGLE_ANALYTICS_PLUGIN = "google-analytics";
   String GOOGLE_ANALYTICS_ACCOUNT_PROPERTY = "sonar.google-analytics.account";
-
-  /* Time machine periods */
-  String TIMEMACHINE_PERIOD_PREFIX = "sonar.timemachine.period";
-  String TIMEMACHINE_MODE_PREVIOUS_ANALYSIS = "previous_analysis";
-  String TIMEMACHINE_MODE_DATE = "date";
-  String TIMEMACHINE_MODE_VERSION = "version";
-  String TIMEMACHINE_MODE_DAYS = "days";
-  String TIMEMACHINE_MODE_PREVIOUS_VERSION = "previous_version";
-  String TIMEMACHINE_DEFAULT_PERIOD_1 = TIMEMACHINE_MODE_PREVIOUS_ANALYSIS;
-  String TIMEMACHINE_DEFAULT_PERIOD_2 = "30";
-  String TIMEMACHINE_DEFAULT_PERIOD_3 = TIMEMACHINE_MODE_PREVIOUS_VERSION;
-  String TIMEMACHINE_DEFAULT_PERIOD_4 = "";
-  String TIMEMACHINE_DEFAULT_PERIOD_5 = "";
 
   /**
    * @since 2.11
@@ -381,16 +362,12 @@ public interface CoreProperties {
 
   /**
    * @since 3.5
-   * @deprecated since 5.2 no more task concept on batch side
    */
-  @Deprecated
   String TASK = "sonar.task";
 
   /**
    * @since 3.6
-   * @deprecated since 5.2 no more task concept on batch side
    */
-  @Deprecated
   String SCAN_TASK = "scan";
 
   /**
@@ -447,7 +424,7 @@ public interface CoreProperties {
    * @since 5.2
    */
   String ANALYSIS_MODE_ISSUES = "issues";
-  
+
   /**
    * @since 5.2
    */
@@ -522,7 +499,7 @@ public interface CoreProperties {
   /**
    * @since 4.5
    */
-  String RATING_GRID_DEF_VALUES = "0.1,0.2,0.5,1";
+  String RATING_GRID_DEF_VALUES = "0.05,0.1,0.2,0.5";
 
   /**
    * @since 4.5

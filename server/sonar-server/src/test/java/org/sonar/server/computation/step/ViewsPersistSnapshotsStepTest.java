@@ -20,13 +20,11 @@
 
 package org.sonar.server.computation.step;
 
-import java.util.Date;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import org.sonar.api.CoreProperties;
 import org.sonar.api.utils.DateUtils;
 import org.sonar.api.utils.System2;
 import org.sonar.db.DbClient;
@@ -34,7 +32,7 @@ import org.sonar.db.DbTester;
 import org.sonar.db.component.ComponentDto;
 import org.sonar.db.component.SnapshotDto;
 import org.sonar.db.component.SnapshotQuery;
-import org.sonar.server.computation.analysis.MutableAnalysisMetadataHolderRule;
+import org.sonar.server.computation.analysis.AnalysisMetadataHolderRule;
 import org.sonar.server.computation.batch.TreeRootHolderRule;
 import org.sonar.server.computation.component.Component;
 import org.sonar.server.computation.component.MapBasedDbIdsRepository;
@@ -47,11 +45,12 @@ import static java.lang.String.valueOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.sonar.core.config.CorePropertyDefinitions.TIMEMACHINE_MODE_DATE;
 import static org.sonar.db.component.ComponentTesting.newProjectCopy;
 import static org.sonar.db.component.ComponentTesting.newProjectDto;
 import static org.sonar.db.component.ComponentTesting.newSubView;
 import static org.sonar.db.component.ComponentTesting.newView;
-import static org.sonar.server.component.SnapshotTesting.createForProject;
+import static org.sonar.db.component.SnapshotTesting.newSnapshotForProject;
 import static org.sonar.server.computation.component.Component.Type.PROJECT_VIEW;
 import static org.sonar.server.computation.component.Component.Type.SUBVIEW;
 import static org.sonar.server.computation.component.Component.Type.VIEW;
@@ -69,7 +68,7 @@ public class ViewsPersistSnapshotsStepTest extends BaseStepTest {
   public TreeRootHolderRule treeRootHolder = new TreeRootHolderRule();
 
   @Rule
-  public MutableAnalysisMetadataHolderRule analysisMetadataHolder = new MutableAnalysisMetadataHolderRule();
+  public AnalysisMetadataHolderRule analysisMetadataHolder = new AnalysisMetadataHolderRule();
 
   @Rule
   public PeriodsHolderRule periodsHolder = new PeriodsHolderRule();
@@ -90,7 +89,7 @@ public class ViewsPersistSnapshotsStepTest extends BaseStepTest {
   public void setup() {
     dbTester.truncateTables();
     analysisDate = DateUtils.parseDateQuietly("2015-06-01").getTime();
-    analysisMetadataHolder.setAnalysisDate(new Date(analysisDate));
+    analysisMetadataHolder.setAnalysisDate(analysisDate);
 
     now = DateUtils.parseDateQuietly("2015-06-02").getTime();
 
@@ -182,8 +181,8 @@ public class ViewsPersistSnapshotsStepTest extends BaseStepTest {
   public void persist_snapshots_with_periods() {
     ComponentDto viewDto = save(newView("ABCD").setKey(valueOf(PROJECT_KEY)).setName("Project"));
     ComponentDto subViewDto = save(newSubView(viewDto, "CDEF", "key").setKey("2"));
-    SnapshotDto viewSnapshotDto = save(createForProject(viewDto).setCreatedAt(DateUtils.parseDateQuietly("2015-01-01").getTime()));
-    SnapshotDto subViewSnapshotDto = save(createForProject(subViewDto).setCreatedAt(DateUtils.parseDateQuietly("2015-01-01").getTime()));
+    SnapshotDto viewSnapshotDto = save(newSnapshotForProject(viewDto).setCreatedAt(DateUtils.parseDateQuietly("2015-01-01").getTime()));
+    SnapshotDto subViewSnapshotDto = save(newSnapshotForProject(subViewDto).setCreatedAt(DateUtils.parseDateQuietly("2015-01-01").getTime()));
     dbTester.getSession().commit();
 
     Component subView = ViewsComponent.builder(SUBVIEW, 2).setUuid("ABCD").build();
@@ -192,17 +191,17 @@ public class ViewsPersistSnapshotsStepTest extends BaseStepTest {
     dbIdsRepository.setComponentId(view, viewDto.getId());
     dbIdsRepository.setComponentId(subView, subViewDto.getId());
 
-    periodsHolder.setPeriods(new Period(1, CoreProperties.TIMEMACHINE_MODE_DATE, "2015-01-01", analysisDate, 123L));
+    periodsHolder.setPeriods(new Period(1, TIMEMACHINE_MODE_DATE, "2015-01-01", analysisDate, 123L));
 
     underTest.execute();
 
     SnapshotDto viewSnapshot = getUnprocessedSnapshot(viewDto.getId());
-    assertThat(viewSnapshot.getPeriodMode(1)).isEqualTo(CoreProperties.TIMEMACHINE_MODE_DATE);
+    assertThat(viewSnapshot.getPeriodMode(1)).isEqualTo(TIMEMACHINE_MODE_DATE);
     assertThat(viewSnapshot.getPeriodDate(1)).isEqualTo(analysisDate);
     assertThat(viewSnapshot.getPeriodModeParameter(1)).isNotNull();
 
     SnapshotDto subViewSnapshot = getUnprocessedSnapshot(subViewDto.getId());
-    assertThat(subViewSnapshot.getPeriodMode(1)).isEqualTo(CoreProperties.TIMEMACHINE_MODE_DATE);
+    assertThat(subViewSnapshot.getPeriodMode(1)).isEqualTo(TIMEMACHINE_MODE_DATE);
     assertThat(subViewSnapshot.getPeriodDate(1)).isEqualTo(analysisDate);
     assertThat(subViewSnapshot.getPeriodModeParameter(1)).isNotNull();
   }

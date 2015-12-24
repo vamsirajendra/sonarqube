@@ -25,22 +25,20 @@ import org.sonar.api.server.ServerSide;
 
 /**
  * @since 3.6
- * @deprecated in 5.2. Webapp can not be customized anymore to define actions on issues.
  */
-@Deprecated
 @ServerSide
 public class Actions {
 
-  private final List<Action> actions = new ArrayList<>();
+  private final List<Action> list = new ArrayList<>();
 
   public Action add(String actionKey) {
     Action action = new Action(actionKey);
-    this.actions.add(action);
+    this.list.add(action);
     return action;
   }
 
   public List<Action> list() {
-    return actions;
+    return list;
   }
 
 }

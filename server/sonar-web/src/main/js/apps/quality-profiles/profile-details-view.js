@@ -4,12 +4,11 @@ import Marionette from 'backbone.marionette';
 import ChangeProfileParentView from './change-profile-parent-view';
 import ProfileChangelogView from './profile-changelog-view';
 import ProfileComparisonView from './profile-comparison-view';
-import 'components/common/select-list';
-import './helpers';
-import './templates';
+import '../../components/common/select-list';
+import Template from './templates/quality-profiles-profile-details.hbs';
 
 export default Marionette.LayoutView.extend({
-  template: Templates['quality-profiles-profile-details'],
+  template: Template,
 
   regions: {
     changelogRegion: '#quality-profile-changelog',
@@ -17,7 +16,7 @@ export default Marionette.LayoutView.extend({
   },
 
   modelEvents: {
-    'change': 'render',
+    'change': 'onChange',
     'flashChangelog': 'flashChangelog'
   },
 
@@ -47,6 +46,13 @@ export default Marionette.LayoutView.extend({
         });
   },
 
+  onChange: function () {
+    var changed = Object.keys(this.model.changedAttributes());
+    if (!(changed.length === 1 && changed[0] === 'projectCount')) {
+      this.render();
+    }
+  },
+
   initProjectsSelect: function () {
     var key = this.model.get('key');
     this.projectsSelectList = new window.SelectList({
@@ -67,14 +73,14 @@ export default Marionette.LayoutView.extend({
       selectParameter: 'projectUuid',
       selectParameterValue: 'uuid',
       labels: {
-        selected: t('quality_gates.projects.with'),
-        deselected: t('quality_gates.projects.without'),
-        all: t('quality_gates.projects.all'),
-        noResults: t('quality_gates.projects.noResults')
+        selected: window.t('quality_gates.projects.with'),
+        deselected: window.t('quality_gates.projects.without'),
+        all: window.t('quality_gates.projects.all'),
+        noResults: window.t('quality_gates.projects.noResults')
       },
       tooltips: {
-        select: t('quality_gates.projects.select_hint'),
-        deselect: t('quality_gates.projects.deselect_hint')
+        select: window.t('quality_profiles.projects.select_hint'),
+        deselect: window.t('quality_profiles.projects.deselect_hint')
       }
     });
     this.listenTo(this.projectsSelectList.collection, 'change:selected', this.onProjectsChange);
@@ -151,5 +157,3 @@ export default Marionette.LayoutView.extend({
     });
   }
 });
-
-

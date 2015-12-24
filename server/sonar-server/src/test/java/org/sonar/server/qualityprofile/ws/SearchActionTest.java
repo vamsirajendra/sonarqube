@@ -37,6 +37,7 @@ import org.sonar.db.component.ComponentDto;
 import org.sonar.db.qualityprofile.QualityProfileDao;
 import org.sonar.db.qualityprofile.QualityProfileDbTester;
 import org.sonar.db.qualityprofile.QualityProfileDto;
+import org.sonar.server.component.ComponentFinder;
 import org.sonar.server.language.LanguageTesting;
 import org.sonar.server.qualityprofile.QProfileFactory;
 import org.sonar.server.qualityprofile.QProfileLoader;
@@ -93,7 +94,14 @@ public class SearchActionTest {
         new RuleDao(System2.INSTANCE),
         System2.INSTANCE));
     ws = new WsActionTester(new SearchAction(
-      new SearchDataLoader(languages, new QProfileLookup(dbClient), profileLoader, new QProfileFactory(oldDbClient), dbClient), languages));
+      new SearchDataLoader(
+        languages,
+        new QProfileLookup(dbClient),
+        profileLoader,
+        new QProfileFactory(oldDbClient),
+        dbClient,
+        new ComponentFinder(dbClient)),
+      languages));
   }
 
   @Test
@@ -162,24 +170,25 @@ public class SearchActionTest {
   }
 
   @Test
-  public void search_for_default_qp() {
+  public void search_for_default_qp_with_profile_name() {
     QualityProfileDto qualityProfileOnXoo1 = QualityProfileDto.createFor("sonar-way-xoo1-12345")
       .setLanguage(xoo1.getKey())
       .setName("Sonar way")
-      .setDefault(true);
+      .setDefault(false);
     QualityProfileDto qualityProfileOnXoo2 = QualityProfileDto.createFor("sonar-way-xoo2-12345")
       .setLanguage(xoo2.getKey())
       .setName("Sonar way")
       .setDefault(true);
     QualityProfileDto anotherQualityProfileOnXoo1 = QualityProfileDto.createFor("sonar-way-xoo1-45678")
       .setLanguage(xoo1.getKey())
-      .setName("Sonar way")
-      .setDefault(false);
+      .setName("Another way")
+      .setDefault(true);
     qualityProfileDb.insertQualityProfiles(qualityProfileOnXoo1, qualityProfileOnXoo2, anotherQualityProfileOnXoo1);
     commit();
 
     String result = ws.newRequest()
       .setParam(PARAM_DEFAULTS, Boolean.TRUE.toString())
+      .setParam(PARAM_PROFILE_NAME, "Sonar way")
       .execute().getInput();
 
     assertThat(result)

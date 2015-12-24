@@ -23,6 +23,7 @@ package org.sonar.server.benchmark;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.junit.Rule;
@@ -37,11 +38,19 @@ import org.sonar.batch.protocol.output.BatchReportWriter;
 import org.sonar.core.util.Uuids;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbTester;
+import org.sonar.server.computation.analysis.AnalysisMetadataHolderRule;
 import org.sonar.server.computation.batch.BatchReportDirectoryHolderImpl;
 import org.sonar.server.computation.batch.BatchReportReaderImpl;
 import org.sonar.server.computation.batch.TreeRootHolderRule;
 import org.sonar.server.computation.component.Component;
 import org.sonar.server.computation.component.ReportComponent;
+import org.sonar.server.computation.duplication.Duplicate;
+import org.sonar.server.computation.duplication.Duplication;
+import org.sonar.server.computation.duplication.DuplicationRepositoryRule;
+import org.sonar.server.computation.duplication.InnerDuplicate;
+import org.sonar.server.computation.duplication.TextBlock;
+import org.sonar.server.computation.scm.ScmInfoRepositoryImpl;
+import org.sonar.server.computation.source.SourceHashRepositoryImpl;
 import org.sonar.server.computation.source.SourceLinesRepositoryImpl;
 import org.sonar.server.computation.step.PersistFileSourcesStep;
 
@@ -57,15 +66,16 @@ public class PersistFileSourcesStepTest {
 
   @Rule
   public TemporaryFolder temp = new TemporaryFolder();
-
   @Rule
   public DbTester dbTester = DbTester.create(System2.INSTANCE);
-
   @Rule
   public Benchmark benchmark = new Benchmark();
-
   @Rule
   public TreeRootHolderRule treeRootHolder = new TreeRootHolderRule();
+  @Rule
+  public AnalysisMetadataHolderRule analysisMetadataHolder = new AnalysisMetadataHolderRule();
+  @Rule
+  public DuplicationRepositoryRule duplicationRepository = DuplicationRepositoryRule.create(treeRootHolder);
 
   @Test
   public void benchmark() throws Exception {
@@ -82,16 +92,21 @@ public class PersistFileSourcesStepTest {
     BatchReportDirectoryHolderImpl batchReportDirectoryHolder = new BatchReportDirectoryHolderImpl();
     batchReportDirectoryHolder.setDirectory(reportDir);
     org.sonar.server.computation.batch.BatchReportReader batchReportReader = new BatchReportReaderImpl(batchReportDirectoryHolder);
-    PersistFileSourcesStep step = new PersistFileSourcesStep(dbClient, System2.INSTANCE, treeRootHolder, batchReportReader, new SourceLinesRepositoryImpl(batchReportReader));
+    analysisMetadataHolder.setBaseProjectSnapshot(null);
+    SourceLinesRepositoryImpl sourceLinesRepository = new SourceLinesRepositoryImpl(batchReportReader);
+    SourceHashRepositoryImpl sourceHashRepository = new SourceHashRepositoryImpl(sourceLinesRepository);
+    ScmInfoRepositoryImpl scmInfoRepository = new ScmInfoRepositoryImpl(batchReportReader, analysisMetadataHolder, dbClient, sourceHashRepository);
+    PersistFileSourcesStep step = new PersistFileSourcesStep(dbClient, System2.INSTANCE, treeRootHolder, batchReportReader, sourceLinesRepository, scmInfoRepository,
+      duplicationRepository);
     step.execute();
 
     long end = System.currentTimeMillis();
     long duration = end - start;
 
     assertThat(dbTester.countRowsOfTable("file_sources")).isEqualTo(NUMBER_OF_FILES);
-    LOGGER.info(String.format("File sources has been persisted in %d ms", duration));
+    LOGGER.info(String.format("File sources have been persisted in %d ms", duration));
 
-    benchmark.expectAround("Duration to persist FILE_SOURCES", duration, 125000, Benchmark.DEFAULT_ERROR_MARGIN_PERCENTS);
+    benchmark.expectAround("Duration to persist FILE_SOURCES", duration, 93700, Benchmark.DEFAULT_ERROR_MARGIN_PERCENTS);
   }
 
   private File prepareReport() throws IOException {
@@ -108,14 +123,18 @@ public class PersistFileSourcesStepTest {
 
     List<Component> components = new ArrayList<>();
     for (int fileRef = 2; fileRef <= NUMBER_OF_FILES + 1; fileRef++) {
-      components.add(generateFileReport(writer, fileRef));
-      project.addChildRef(fileRef);
+      ReportComponent component = ReportComponent.builder(Component.Type.FILE, fileRef).setUuid(Uuids.create()).setKey("PROJECT:" + fileRef).build();
+      components.add(component);
     }
     treeRootHolder.setRoot(ReportComponent.builder(Component.Type.PROJECT, 1)
       .setUuid(PROJECT_UUID)
       .setKey("PROJECT")
       .addChildren(components.toArray(new Component[components.size()]))
       .build());
+    for (int fileRef = 2; fileRef <= NUMBER_OF_FILES + 1; fileRef++) {
+      generateFileReport(writer, fileRef);
+      project.addChildRef(fileRef);
+    }
 
     writer.writeComponent(project.build());
 
@@ -126,6 +145,13 @@ public class PersistFileSourcesStepTest {
     LineData lineData = new LineData();
     for (int line = 1; line <= NUMBER_OF_LINES; line++) {
       lineData.generateLineData(line);
+      duplicationRepository.add(
+        fileRef,
+        new Duplication(
+          new TextBlock(line, line),
+          Arrays.<Duplicate>asList(new InnerDuplicate(new TextBlock(line + 1, line + 1)))
+        )
+        );
     }
     writer.writeComponent(BatchReport.Component.newBuilder()
       .setRef(fileRef)
@@ -138,7 +164,6 @@ public class PersistFileSourcesStepTest {
     writer.writeComponentChangesets(lineData.changesetsBuilder.setComponentRef(fileRef).build());
     writer.writeComponentSyntaxHighlighting(fileRef, lineData.highlightings);
     writer.writeComponentSymbols(fileRef, lineData.symbols);
-    writer.writeComponentDuplications(fileRef, lineData.duplications);
 
     return ReportComponent.builder(Component.Type.FILE, fileRef).setUuid(Uuids.create()).setKey("PROJECT:" + fileRef).build();
   }
@@ -149,7 +174,6 @@ public class PersistFileSourcesStepTest {
     List<BatchReport.Coverage> coverages = new ArrayList<>();
     List<BatchReport.SyntaxHighlighting> highlightings = new ArrayList<>();
     List<BatchReport.Symbol> symbols = new ArrayList<>();
-    List<BatchReport.Duplication> duplications = new ArrayList<>();
 
     void generateLineData(int line) {
       lines.add("line-" + line);
@@ -185,19 +209,6 @@ public class PersistFileSourcesStepTest {
           .build())
         .addReference(BatchReport.TextRange.newBuilder()
           .setStartLine(line + 1).setEndLine(line + 1).setStartOffset(1).setEndOffset(3)
-          .build())
-        .build());
-
-      duplications.add(BatchReport.Duplication.newBuilder()
-        .setOriginPosition(BatchReport.TextRange.newBuilder()
-          .setStartLine(line)
-          .setEndLine(line)
-          .build())
-        .addDuplicate(BatchReport.Duplicate.newBuilder()
-          .setRange(BatchReport.TextRange.newBuilder()
-            .setStartLine(line + 1)
-            .setEndLine(line + 1)
-            .build())
           .build())
         .build());
     }

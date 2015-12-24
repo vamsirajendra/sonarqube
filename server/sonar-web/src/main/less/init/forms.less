@@ -11,13 +11,14 @@ input[type=password],
 input[type=email],
 input[type=search],
 input[type=date],
-textarea {
+textarea,
+select {
   border: 1px solid @darkGrey;
-  .box-sizing(border-box);
+  box-sizing: border-box;
   border-radius: 2px;
   background: #fff;
   color: @baseFontColor;
-  .trans(border-color);
+  transition: border-color 0.2s ease;
 
   &:active,
   &:focus {
@@ -46,6 +47,11 @@ textarea {
   padding: 3px;
 }
 
+select {
+  height: @formControlHeight;
+  line-height: @formControlHeight;
+}
+
 button,
 .button,
 input[type=submit],
@@ -58,7 +64,7 @@ input[type=button] {
 
   border: 1px solid @darkBlue;
   border-radius: 2px;
-  .box-sizing(border-box);
+  box-sizing: border-box;
 
   background: transparent;
 
@@ -70,7 +76,7 @@ input[type=button] {
 
   cursor: pointer;
   outline: none;
-  .trans(border-color);
+  transition: border-color 0.2s ease;
 
   &:hover, &:focus {
     background: @darkBlue;
@@ -92,7 +98,8 @@ input[type=button] {
   }
 }
 
-.button-red {
+.button-red,
+input[type="submit"].button-red {
   border-color: @red;
   color: @red;
 
@@ -123,7 +130,7 @@ input[type=button] {
   font-weight: 400;
   font-size: inherit;
   line-height: inherit;
-  .trans;
+  transition: all 0.2s ease;
 
   &:hover, &:active, &:focus {
     background: transparent;

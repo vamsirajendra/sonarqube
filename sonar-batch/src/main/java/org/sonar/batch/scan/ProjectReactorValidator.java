@@ -19,12 +19,17 @@
  */
 package org.sonar.batch.scan;
 
+import org.sonar.api.utils.MessageException;
+
+import org.sonar.batch.analysis.DefaultAnalysisMode;
 import com.google.common.base.Joiner;
+
 import java.util.ArrayList;
 import java.util.List;
+
 import javax.annotation.Nullable;
+
 import org.apache.commons.lang.StringUtils;
-import org.sonar.api.CoreProperties;
 import org.sonar.api.batch.bootstrap.ProjectDefinition;
 import org.sonar.api.batch.bootstrap.ProjectReactor;
 import org.sonar.api.config.Settings;
@@ -38,30 +43,42 @@ public class ProjectReactorValidator {
 
   private static final String SONAR_PHASE = "sonar.phase";
   private final Settings settings;
+  private final DefaultAnalysisMode mode;
 
-  public ProjectReactorValidator(Settings settings) {
+  public ProjectReactorValidator(Settings settings, DefaultAnalysisMode mode) {
     this.settings = settings;
+    this.mode = mode;
   }
 
   public void validate(ProjectReactor reactor) {
-    String branch = settings.getString(CoreProperties.PROJECT_BRANCH_PROPERTY);
-    String rootProjectKey = ComponentKeys.createKey(reactor.getRoot().getKey(), branch);
+    String branch = reactor.getRoot().getBranch();
 
     List<String> validationMessages = new ArrayList<>();
     checkDeprecatedProperties(validationMessages);
 
     for (ProjectDefinition moduleDef : reactor.getProjects()) {
-      validateModule(moduleDef, validationMessages, branch, rootProjectKey);
+      if (mode.isIssues()) {
+        validateModuleIssuesMode(moduleDef, validationMessages);
+      } else {
+        validateModule(moduleDef, validationMessages);
+      }
     }
 
     validateBranch(validationMessages, branch);
 
     if (!validationMessages.isEmpty()) {
-      throw new IllegalStateException("Validation of project reactor failed:\n  o " + Joiner.on("\n  o ").join(validationMessages));
+      throw MessageException.of("Validation of project reactor failed:\n  o " + Joiner.on("\n  o ").join(validationMessages));
     }
   }
 
-  private static void validateModule(ProjectDefinition moduleDef, List<String> validationMessages, @Nullable String branch, String rootProjectKey) {
+  private static void validateModuleIssuesMode(ProjectDefinition moduleDef, List<String> validationMessages) {
+    if (!ComponentKeys.isValidModuleKeyIssuesMode(moduleDef.getKey())) {
+      validationMessages.add(String.format("\"%s\" is not a valid project or module key. "
+        + "Allowed characters in issues mode are alphanumeric, '-', '_', '.', '/' and ':', with at least one non-digit.", moduleDef.getKey()));
+    }
+  }
+
+  private static void validateModule(ProjectDefinition moduleDef, List<String> validationMessages) {
     if (!ComponentKeys.isValidModuleKey(moduleDef.getKey())) {
       validationMessages.add(String.format("\"%s\" is not a valid project or module key. "
         + "Allowed characters are alphanumeric, '-', '_', '.' and ':', with at least one non-digit.", moduleDef.getKey()));

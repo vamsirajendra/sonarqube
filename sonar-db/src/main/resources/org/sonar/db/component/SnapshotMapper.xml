@@ -56,10 +56,22 @@
     where s.islast=${_true} and s.project_id = #{resource}
   </select>
 
+  <select id="countLastSnapshotByComponentUuid" resultType="Integer">
+    SELECT count(s.id)
+    FROM snapshots s
+    INNER JOIN projects p ON p.id=s.project_id AND p.uuid=#{componentUuid}
+    <where>
+      AND s.islast=${_true}
+    </where>
+  </select>
+
   <select id="selectSnapshotsByQuery" parameterType="map" resultType="Snapshot">
     SELECT
     <include refid="snapshotColumns"/>
     FROM snapshots s
+    <if test="query.componentUuid != null">
+      INNER JOIN projects p ON p.id=s.project_id AND p.uuid=#{query.componentUuid} AND p.enabled=${_true}
+    </if>
     <where>
       <if test="query.componentId != null">
         AND s.project_id=#{query.componentId}
@@ -105,8 +117,20 @@
     <include refid="snapshotColumns"/>
     FROM snapshots s
     INNER JOIN events e ON s.id = e.snapshot_id AND e.name &lt;&gt; #{lastVersion} AND e.category='Version'
-    INNER JOIN projects p ON p.uuid=e.component_uuid AND p.id=#{componentId}
+    <where>
+      s.project_id=#{componentId}
+    </where>
     ORDER BY e.event_date DESC
+  </select>
+
+  <select id="selectOldestSnapshots" parameterType="map" resultType="Snapshot">
+    SELECT
+    <include refid="snapshotColumns"/>
+    FROM snapshots s
+    <where>
+      s.project_id=#{componentId}
+    </where>
+    ORDER BY s.created_at ASC
   </select>
 
   <select id="selectSnapshotAndChildrenOfScope" parameterType="map" resultType="Snapshot">

@@ -19,11 +19,13 @@
  */
 package org.sonar.server.computation.queue;
 
-import org.picocontainer.Startable;
+import org.sonar.api.platform.Server;
+import org.sonar.api.platform.ServerStartHandler;
 import org.sonar.api.server.ServerSide;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
 import org.sonar.server.computation.monitoring.CEQueueStatus;
+import org.sonar.server.computation.taskprocessor.CeProcessingScheduler;
 
 /**
  * Cleans-up the queue, initializes JMX counters then schedule
@@ -31,12 +33,13 @@ import org.sonar.server.computation.monitoring.CEQueueStatus;
  * from peeking the queue before it's ready.
  */
 @ServerSide
-public class CeQueueInitializer implements Startable {
+public class CeQueueInitializer implements ServerStartHandler {
 
   private final DbClient dbClient;
   private final CEQueueStatus queueStatus;
   private final CeQueueCleaner cleaner;
   private final CeProcessingScheduler scheduler;
+  private boolean done = false;
 
   public CeQueueInitializer(DbClient dbClient, CEQueueStatus queueStatus, CeQueueCleaner cleaner, CeProcessingScheduler scheduler) {
     this.dbClient = dbClient;
@@ -46,7 +49,14 @@ public class CeQueueInitializer implements Startable {
   }
 
   @Override
-  public void start() {
+  public void onServerStart(Server server) {
+    if (!done) {
+      initCe();
+      this.done = true;
+    }
+  }
+
+  private void initCe() {
     DbSession dbSession = dbClient.openSession(false);
     try {
       initJmxCounters(dbSession);
@@ -56,11 +66,6 @@ public class CeQueueInitializer implements Startable {
     } finally {
       dbClient.closeSession(dbSession);
     }
-  }
-
-  @Override
-  public void stop() {
-    // nothing to do
   }
 
   private void initJmxCounters(DbSession dbSession) {

@@ -1,11 +1,11 @@
-import ModalForm from 'components/common/modal-form';
-import './templates';
+import ModalForm from '../../components/common/modal-form';
+import Template from './templates/users-change-password.hbs';
 
 export default ModalForm.extend({
-  template: Templates['users-change-password'],
+  template: Template,
 
-  onFormSubmit: function (e) {
-    this._super(e);
+  onFormSubmit: function () {
+    ModalForm.prototype.onFormSubmit.apply(this, arguments);
     this.sendRequest();
   },
 
